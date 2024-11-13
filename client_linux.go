@@ -7,10 +7,15 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/binary"
+	"encoding/hex"
+	"errors"
+	"fmt"
 	"net"
 	"os"
 	"time"
 	"unicode/utf8"
+
+	"log"
 
 	"github.com/mdlayher/genetlink"
 	"github.com/mdlayher/netlink"
@@ -19,6 +24,9 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// errNotSupported is returned when an operation is not supported
+var errNotSupported = errors.New("not supported")
+
 // A client is the Linux implementation of osClient, which makes use of
 // netlink, generic netlink, and nl80211 to provide access to WiFi device
 // actions and statistics.
@@ -26,6 +34,7 @@ type client struct {
 	c             *genetlink.Conn
 	familyID      uint16
 	familyVersion uint8
+	groups        []genetlink.MulticastGroup
 }
 
 // newClient dials a generic netlink connection and verifies that nl80211
@@ -63,6 +72,7 @@ func initClient(c *genetlink.Conn) (*client, error) {
 		c:             c,
 		familyID:      family.ID,
 		familyVersion: family.Version,
+		groups:        family.Groups,
 	}, nil
 }
 
@@ -116,9 +126,19 @@ func (c *client) Disconnect(ifi *Interface) error {
 // ConnectWPAPSK starts connecting the interface to the specified SSID using
 // WPA.
 func (c *client) ConnectWPAPSK(ifi *Interface, ssid, psk string) error {
+	/*
+		support, err := c.checkExtFeature(ifi, unix.NL80211_EXT_FEATURE_4WAY_HANDSHAKE_STA_PSK)
+		if err != nil {
+			return err
+		}
+		if !support {
+			return errNotSupported
+		}
+	*/
+
 	// Ask nl80211 to connect to the specified SSID with key..
 	_, err := c.get(
-		unix.NL80211_CMD_CONNECT,
+		unix.NL80211_CMD_ASSOCIATE,
 		netlink.Acknowledge,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
@@ -133,7 +153,7 @@ func (c *client) ConnectWPAPSK(ifi *Interface, ssid, psk string) error {
 			ae.Uint32(unix.NL80211_ATTR_CIPHER_SUITE_GROUP, cipherSuites)
 			ae.Uint32(unix.NL80211_ATTR_CIPHER_SUITES_PAIRWISE, cipherSuites)
 			ae.Uint32(unix.NL80211_ATTR_AKM_SUITES, akmSuites)
-			ae.Flag(unix.NL80211_ATTR_WANT_1X_4WAY_HS, true)
+			// ae.Flag(unix.NL80211_ATTR_WANT_1X_4WAY_HS, true)
 			ae.Bytes(
 				unix.NL80211_ATTR_PMK,
 				wpaPassphrase([]byte(ssid), []byte(psk)),
@@ -256,6 +276,266 @@ func (c *client) execute(
 		netlink.Request|flags,
 	)
 }
+
+// *******************************
+// ADDITIONS START
+// List of scan status
+const (
+	scan_start = iota
+	scan_abort
+	scan_done
+)
+
+func (c *client) TriggerScan(ifi *Interface) error {
+	// need a new socket to receive multicast message about scan status from kernel
+	informer := make(chan uint8)
+	var err error
+	go func(informer chan<- uint8) {
+		conn, err := genetlink.Dial(nil)
+		if err != nil {
+			log.Printf("netlink dial failed - %s\n", err)
+			return
+		}
+		defer conn.Close()
+
+		for _, group := range c.groups {
+			if group.Name == unix.NL80211_MULTICAST_GROUP_SCAN {
+				err = conn.JoinGroup(group.ID)
+				if err != nil {
+					log.Printf("join group  failed - %s\n", err)
+					return
+				}
+			}
+		}
+
+		informer <- scan_start
+		for {
+			genl_msgs, _, err := conn.Receive()
+			if err != nil {
+				log.Printf("netlink con receive failed - %s\n", err)
+				return
+			}
+			for _, msg := range genl_msgs {
+				switch msg.Header.Command {
+				case unix.NL80211_CMD_TRIGGER_SCAN:
+					continue
+				case unix.NL80211_CMD_SCAN_ABORTED:
+					informer <- scan_abort
+					goto END
+				case unix.NL80211_CMD_NEW_SCAN_RESULTS:
+					informer <- scan_done
+					goto END
+				}
+			}
+		}
+	END:
+		return
+	}(informer)
+
+	// scan starts
+	<-informer
+
+	/*
+		// TRIGGER_SCAN
+				msgs, err := c.get(
+					unix.NL80211_CMD_TRIGGER_SCAN,
+					netlink.Acknowledge,
+					ifi,
+					func(ae *netlink.AttributeEncoder) {
+						ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
+						ae.Nested(unix.NL80211_ATTR_SCAN_SSIDS, func(nae *netlink.AttributeEncoder) error {
+							nae.Bytes(unix.NL80211_ATTR_SCHED_SCAN_MATCH_SSID, nlenc.Bytes(""))
+							return nil
+						})
+					},
+				)
+				if err != nil {
+					log.Printf("netlink NL80211_CMD_TRIGGER_SCAN failed - %s\n", err)
+					return
+				}
+
+				log.Printf("netlink NL80211_CMD_TRIGGER_SCAN num messages returned - %d\n", len(msgs))
+
+				for _, m := range msgs {
+					if m.Header.Version != c.familyVersion {
+						log.Printf("************* SCAN INVALID FAMILY")
+						continue
+					}
+					if m.Header.Command == unix.NL80211_CMD_SCAN_ABORTED {
+						log.Printf("************* SCAN ABORTED")
+						return
+					}
+					if m.Header.Command == unix.NL80211_CMD_NEW_SCAN_RESULTS {
+						log.Printf("*************NEW SCAN RESULTS")
+						break
+					}
+
+					log.Printf("*************NOTHING NOTHING")
+				}
+	*/
+	_, err = c.get(
+		unix.NL80211_CMD_TRIGGER_SCAN,
+		netlink.Acknowledge,
+		ifi,
+		nil,
+	)
+	if err != nil {
+		return err
+	}
+	// wait for kernel to inform the scan status
+	if status := <-informer; status == scan_abort {
+		return errors.New("NL80211 Scan aborted by kernel")
+	}
+
+	log.Printf("SCAN DONE\n")
+
+	return nil
+}
+
+// checkExtFeature Checks if a physical interface supports a extended feature
+func (c *client) checkExtFeature(ifi *Interface, feature uint) (bool, error) {
+	msgs, err := c.get(
+		unix.NL80211_CMD_GET_WIPHY,
+		netlink.Dump,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			ae.Flag(unix.NL80211_ATTR_SPLIT_WIPHY_DUMP, true)
+		},
+	)
+	if err != nil {
+		return false, err
+	}
+
+	var features []byte
+found:
+	for i := range msgs {
+		attrs, err := netlink.UnmarshalAttributes(msgs[i].Data)
+		if err != nil {
+			return false, err
+		}
+		for _, a := range attrs {
+			if a.Type == unix.NL80211_ATTR_EXT_FEATURES {
+				features = a.Data
+				break found
+			}
+		}
+	}
+
+	if feature/8 >= uint(len(features)) {
+		return false, nil
+	}
+
+	return (features[feature/8]&(1<<(feature%8)) != 0), nil
+}
+
+// AllBSS requests that nl80211 return all the BSS around the specified Interface.
+func (c *client) AllBSS(ifi *Interface) ([]*BSS, error) {
+	msgs, err := c.get(
+		unix.NL80211_CMD_GET_SCAN,
+		netlink.Dump,
+		ifi,
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return parseAllBSS(msgs)
+}
+
+// parseAllBSS parses all the BSS from nl80211 BSS messages
+func parseAllBSS(msgs []genetlink.Message) ([]*BSS, error) {
+	fmt.Println(len(msgs))
+	all_bss := make([]*BSS, 0, len(msgs))
+	for _, m := range msgs {
+		attrs, err := netlink.UnmarshalAttributes(m.Data)
+		if err != nil {
+			return nil, err
+		}
+
+		var bss BSS
+		for _, a := range attrs {
+			if a.Type != unix.NL80211_ATTR_BSS {
+				continue
+			}
+
+			nattrs, err := netlink.UnmarshalAttributes(a.Data)
+			if err != nil {
+				return nil, err
+			}
+
+			if !attrsContain(nattrs, unix.NL80211_BSS_STATUS) {
+				bss.Status = BSSStatusDisAssociated
+			}
+
+			if err := (&bss).parseAttributes(nattrs); err != nil {
+				continue
+			}
+		}
+		all_bss = append(all_bss, &bss)
+	}
+	return all_bss, nil
+}
+
+func (c *client) GetWiPhy(ifi *Interface) error {
+	msgs, err := c.get(
+		unix.NL80211_CMD_GET_WIPHY,
+		netlink.Dump,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			ae.Flag(unix.NL80211_ATTR_SPLIT_WIPHY_DUMP, true)
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("Printing MULTICAST Groups\n")
+	for _, v := range c.groups {
+		log.Printf("%s - %d\n", v.Name, v.ID)
+	}
+
+	log.Printf("these many messages recvd: %d\n", len(msgs))
+
+	// stations := make([]*StationInfo, len(msgs))
+	for i := range msgs {
+		if _, err = parseWiPhyInfo(msgs[i].Data); err != nil {
+			// log.Println(err)
+		}
+	}
+
+	return nil
+}
+
+func parseWiPhyInfo(b []byte) (*StationInfo, error) {
+	attrs, err := netlink.UnmarshalAttributes(b)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("these many attrs recvd: %d\n", len(attrs))
+
+	for _, a := range attrs {
+		switch a.Type {
+		case unix.NL80211_ATTR_CIPHER_SUITES:
+			log.Printf("cipher len: %d\n", len(a.Data))
+
+			for i := 0; i < (len(a.Data) / 4); i++ {
+				c := a.Data[i:(i + 4)]
+				log.Printf("Supported Cipher: %s\n", hex.EncodeToString(c))
+			}
+		case unix.NL80211_ATTR_WIPHY_NAME:
+			log.Printf("************************** WIPHY name - %s\n", string(a.Data))
+		case unix.NL80211_ATTR_AKM_SUITES:
+			log.Printf("************************** AKM Suites found")
+		}
+	}
+
+	// No station info found
+	return nil, os.ErrNotExist
+}
+
+// ADDITIONS END
+//********************************
 
 // parseInterfaces parses zero or more Interfaces from nl80211 interface
 // messages.

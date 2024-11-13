@@ -74,3 +74,21 @@ func (c *Client) SetReadDeadline(t time.Time) error {
 func (c *Client) SetWriteDeadline(t time.Time) error {
 	return c.c.SetWriteDeadline(t)
 }
+
+//*******************************
+// ADDITIONS START
+
+func (c *Client) GetWiPhy(ifi *Interface) error {
+	return c.c.GetWiPhy(ifi)
+}
+
+func (c *Client) AllBSS(ifi *Interface) ([]*BSS, error) {
+	return c.c.AllBSS(ifi)
+}
+
+func (c *Client) TriggerScan(ifi *Interface) error {
+	return c.c.TriggerScan(ifi)
+}
+
+// ADDITIONS END
+//********************************
