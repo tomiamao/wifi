@@ -1,4 +1,4 @@
-module github.com/mdlayher/wifi
+module github.com/tomiamao/wifi
 
 go 1.22
 
