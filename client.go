@@ -1,6 +1,7 @@
 package wifi
 
 import (
+	"net"
 	"time"
 )
 
@@ -77,6 +78,18 @@ func (c *Client) SetWriteDeadline(t time.Time) error {
 
 //*******************************
 // ADDITIONS START
+
+func (c *Client) StartMulticastProcessing() {
+	c.c.StartMulticastProcessing()
+}
+
+func (c *Client) Authenticate(ifi *Interface, apMacAddr net.HardwareAddr, ssid string, freq uint32) error {
+	return c.c.Authenticate(ifi, apMacAddr, ssid, freq)
+}
+
+func (c *Client) Associate(ifi *Interface, apMacAddr net.HardwareAddr, ssid string, freq uint32) error {
+	return c.c.Associate(ifi, apMacAddr, ssid, freq)
+}
 
 func (c *Client) GetWiPhy(ifi *Interface) error {
 	return c.c.GetWiPhy(ifi)

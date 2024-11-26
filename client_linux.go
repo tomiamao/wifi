@@ -8,7 +8,6 @@ import (
 	"crypto/sha1"
 	"encoding/binary"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -17,6 +16,8 @@ import (
 
 	"log"
 
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"github.com/mdlayher/genetlink"
 	"github.com/mdlayher/netlink"
 	"github.com/mdlayher/netlink/nlenc"
@@ -24,14 +25,12 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// errNotSupported is returned when an operation is not supported
-var errNotSupported = errors.New("not supported")
-
 // A client is the Linux implementation of osClient, which makes use of
 // netlink, generic netlink, and nl80211 to provide access to WiFi device
 // actions and statistics.
 type client struct {
 	c             *genetlink.Conn
+	multicastConn *genetlink.Conn
 	familyID      uint16
 	familyVersion uint8
 	groups        []genetlink.MulticastGroup
@@ -68,8 +67,44 @@ func initClient(c *genetlink.Conn) (*client, error) {
 		return nil, err
 	}
 
+	// conn for multicast updates
+	conn, err := genetlink.Dial(nil)
+	if err != nil {
+		log.Printf("netlink dial failed - %s\n", err)
+		return nil, err
+	}
+
+	for _, group := range family.Groups {
+		if group.Name == unix.NL80211_MULTICAST_GROUP_SCAN {
+			err = conn.JoinGroup(group.ID)
+			if err != nil {
+				log.Printf("join group  failed - %s\n", err)
+				return nil, err
+			}
+		} else if group.Name == unix.NL80211_MULTICAST_GROUP_MLME {
+			err = conn.JoinGroup(group.ID)
+			if err != nil {
+				log.Printf("join group  failed - %s\n", err)
+				return nil, err
+			}
+		} else if group.Name == unix.NL80211_MULTICAST_GROUP_REG {
+			err = conn.JoinGroup(group.ID)
+			if err != nil {
+				log.Printf("join group  failed - %s\n", err)
+				return nil, err
+			}
+		} else if group.Name == unix.NL80211_MULTICAST_GROUP_VENDOR {
+			err = conn.JoinGroup(group.ID)
+			if err != nil {
+				log.Printf("join group  failed - %s\n", err)
+				return nil, err
+			}
+		}
+	}
+
 	return &client{
 		c:             c,
+		multicastConn: conn,
 		familyID:      family.ID,
 		familyVersion: family.Version,
 		groups:        family.Groups,
@@ -126,19 +161,30 @@ func (c *client) Disconnect(ifi *Interface) error {
 // ConnectWPAPSK starts connecting the interface to the specified SSID using
 // WPA.
 func (c *client) ConnectWPAPSK(ifi *Interface, ssid, psk string) error {
-	/*
-		support, err := c.checkExtFeature(ifi, unix.NL80211_EXT_FEATURE_4WAY_HANDSHAKE_STA_PSK)
-		if err != nil {
-			return err
-		}
-		if !support {
-			return errNotSupported
-		}
-	*/
+	support, err := c.checkExtFeature(ifi, unix.NL80211_EXT_FEATURE_4WAY_HANDSHAKE_STA_PSK)
+	if err != nil {
+		log.Printf("checkExtFeature NL80211_EXT_FEATURE_4WAY_HANDSHAKE_STA_PSK not supported\n")
+		return err
+	}
+	if !support {
+		log.Printf("NL80211_EXT_FEATURE_4WAY_HANDSHAKE_STA_PSK not supported\n")
+		// return errNotSupported
+		return fmt.Errorf("errNotSupported")
+	}
+
+	support, err = c.checkExtFeature(ifi, unix.NL80211_EXT_FEATURE_4WAY_HANDSHAKE_STA_1X)
+	if err != nil {
+		log.Printf("checkExtFeature NL80211_EXT_FEATURE_4WAY_HANDSHAKE_STA_1X not supported\n")
+		return err
+	}
+	if !support {
+		log.Printf("NL80211_EXT_FEATURE_4WAY_HANDSHAKE_STA_1X not supported\n")
+		return fmt.Errorf("errNotSupported")
+	}
 
 	// Ask nl80211 to connect to the specified SSID with key..
-	_, err := c.get(
-		unix.NL80211_CMD_ASSOCIATE,
+	_, err = c.get(
+		unix.NL80211_CMD_CONNECT,
 		netlink.Acknowledge,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
@@ -153,7 +199,7 @@ func (c *client) ConnectWPAPSK(ifi *Interface, ssid, psk string) error {
 			ae.Uint32(unix.NL80211_ATTR_CIPHER_SUITE_GROUP, cipherSuites)
 			ae.Uint32(unix.NL80211_ATTR_CIPHER_SUITES_PAIRWISE, cipherSuites)
 			ae.Uint32(unix.NL80211_ATTR_AKM_SUITES, akmSuites)
-			// ae.Flag(unix.NL80211_ATTR_WANT_1X_4WAY_HS, true)
+			ae.Flag(unix.NL80211_ATTR_WANT_1X_4WAY_HS, true)
 			ae.Bytes(
 				unix.NL80211_ATTR_PMK,
 				wpaPassphrase([]byte(ssid), []byte(psk)),
@@ -161,6 +207,8 @@ func (c *client) ConnectWPAPSK(ifi *Interface, ssid, psk string) error {
 			ae.Uint32(unix.NL80211_ATTR_AUTH_TYPE, unix.NL80211_AUTHTYPE_OPEN_SYSTEM)
 		},
 	)
+
+	log.Printf("client::ConnectWPAPSK() error - %s\n", err)
 	return err
 }
 
@@ -279,62 +327,334 @@ func (c *client) execute(
 
 // *******************************
 // ADDITIONS START
-// List of scan status
-const (
-	scan_start = iota
-	scan_abort
-	scan_done
-)
 
-func (c *client) TriggerScan(ifi *Interface) error {
-	// need a new socket to receive multicast message about scan status from kernel
-	informer := make(chan uint8)
-	var err error
-	go func(informer chan<- uint8) {
-		conn, err := genetlink.Dial(nil)
-		if err != nil {
-			log.Printf("netlink dial failed - %s\n", err)
+func (c *client) Authenticate(ifi *Interface, apMacAddr net.HardwareAddr, ssid string, freq uint32) error {
+	_, err := c.get(
+		unix.NL80211_CMD_AUTHENTICATE,
+		netlink.Acknowledge,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
+			ae.Uint32(unix.NL80211_ATTR_WIPHY_FREQ, freq)
+			ae.Bytes(unix.NL80211_ATTR_MAC, apMacAddr)
+			ae.Bytes(unix.NL80211_ATTR_SSID, []byte(ssid))
+			ae.Uint32(unix.NL80211_ATTR_AUTH_TYPE, unix.NL80211_AUTHTYPE_OPEN_SYSTEM)
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *client) Associate(ifi *Interface, apMacAddr net.HardwareAddr, ssid string, freq uint32) error {
+	const (
+		cipherSuites = 0xfac04
+		akmSuites    = 0xfac02
+	)
+
+	_, err := c.get(
+		unix.NL80211_CMD_ASSOCIATE,
+		netlink.Acknowledge,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
+			ae.Uint32(unix.NL80211_ATTR_WIPHY_FREQ, freq)
+			ae.Bytes(unix.NL80211_ATTR_MAC, apMacAddr)
+			ae.Bytes(unix.NL80211_ATTR_SSID, []byte(ssid))
+
+			ae.Uint32(unix.NL80211_ATTR_WPA_VERSIONS, unix.NL80211_WPA_VERSION_2)
+			ae.Uint32(unix.NL80211_ATTR_CIPHER_SUITES_PAIRWISE, cipherSuites)
+			ae.Uint32(unix.NL80211_ATTR_CIPHER_SUITE_GROUP, cipherSuites)
+			ae.Uint32(unix.NL80211_ATTR_CIPHER_SUITE_GROUP, cipherSuites)
+			ae.Uint32(unix.NL80211_ATTR_AKM_SUITES, akmSuites)
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *client) StartMulticastProcessing() {
+	go c.processMulticastEvents()
+}
+
+// register multicast event
+func (c *client) RegisterMulticastGroup(grp string) error {
+	for _, group := range c.groups {
+		if group.Name == grp {
+			err := c.multicastConn.JoinGroup(group.ID)
+			if err != nil {
+				log.Printf("join group  failed - %s\n", err)
+				return err
+			}
+			return nil
+		}
+	}
+	return nil
+}
+
+func checkLayers(p gopacket.Packet, want []gopacket.LayerType) {
+	layers := p.Layers()
+	log.Println("Checking packet layers, want", want)
+	for _, l := range layers {
+		log.Printf("  Got layer %v, %d bytes, payload of %d bytes", l.LayerType(),
+			len(l.LayerContents()), len(l.LayerPayload()))
+	}
+	log.Printf("%v\n", p)
+	if len(layers) < len(want) {
+		log.Printf("  Number of layers mismatch: got %d want %d", len(layers),
+			len(want))
+		return
+	}
+	for i, l := range want {
+		if l == gopacket.LayerTypePayload {
+			// done matching layers
 			return
 		}
-		defer conn.Close()
 
-		for _, group := range c.groups {
-			if group.Name == unix.NL80211_MULTICAST_GROUP_SCAN {
-				err = conn.JoinGroup(group.ID)
+		if layers[i].LayerType() != l {
+			log.Printf("  Layer %d mismatch: got %v want %v", i,
+				layers[i].LayerType(), l)
+		}
+	}
+}
+
+func (c *client) processMulticastEvents() {
+	for {
+		genl_msgs, _, err := c.multicastConn.Receive()
+		if err != nil {
+			log.Printf("netlink multicast event receive failed - %s\n", err)
+			return
+		}
+		for _, msg := range genl_msgs {
+			switch msg.Header.Command {
+			case unix.NL80211_CMD_TRIGGER_SCAN:
+				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_TRIGGER_SCAN\n")
+				continue
+			case unix.NL80211_CMD_SCAN_ABORTED:
+				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_SCAN_ABORTED\n")
+				continue
+			case unix.NL80211_CMD_NEW_SCAN_RESULTS:
+				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_NEW_SCAN_RESULTS\n")
+				continue
+			case unix.NL80211_CMD_SCHED_SCAN_STOPPED:
+				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_SCHED_SCAN_STOPPED\n")
+				continue
+			case unix.NL80211_CMD_AUTHENTICATE:
+				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_AUTHENTICATE\n")
+				// extract params
+
+				/*
+					attrs, err := netlink.UnmarshalAttributes(msg.Data)
+					if err != nil {
+						log.Printf("processMulticastEvents() NL80211_CMD_AUTHENTICATE error I - %s\n", err)
+						continue
+					}
+				*/
+
+				ad, err := netlink.NewAttributeDecoder(msg.Data)
 				if err != nil {
-					log.Printf("join group  failed - %s\n", err)
-					return
-				}
-			}
-		}
-
-		informer <- scan_start
-		for {
-			genl_msgs, _, err := conn.Receive()
-			if err != nil {
-				log.Printf("netlink con receive failed - %s\n", err)
-				return
-			}
-			for _, msg := range genl_msgs {
-				switch msg.Header.Command {
-				case unix.NL80211_CMD_TRIGGER_SCAN:
+					log.Printf("processMulticastEvents() NL80211_CMD_AUTHENTICATE failed to decode attributes I - %s\n", err)
 					continue
-				case unix.NL80211_CMD_SCAN_ABORTED:
-					informer <- scan_abort
-					goto END
-				case unix.NL80211_CMD_NEW_SCAN_RESULTS:
-					informer <- scan_done
-					goto END
 				}
+
+				// Return a nil slice when there are no attributes to decode.
+				if ad.Len() == 0 {
+					log.Printf("processMulticastEvents() NL80211_CMD_AUTHENTICATE No attributes found\n")
+					continue
+				}
+
+				log.Printf("processMulticastEvents() NL80211_CMD_AUTHENTICATE number of attributes found - %d\n", ad.Len())
+
+				// attrs := make([]netlink.Attribute, 0, ad.Len())
+
+				for ad.Next() {
+					aType := ad.Type()
+
+					if aType == unix.NL80211_ATTR_MAC {
+						log.Printf("NL80211_CMD_AUTHENTICATE ATTR_MAC found\n")
+					} else if aType == unix.NL80211_ATTR_FRAME {
+
+						aData := ad.Bytes()
+
+						log.Printf("NL80211_CMD_AUTHENTICATE ATTR_FRAME found actual len - %d\n", len(aData))
+
+						if len(aData) == 0 {
+							log.Printf("NL80211_CMD_AUTHENTICATE ATTR_FRAME no data present\n")
+							continue
+						}
+
+						// parse 802.11 mgmt frame
+						p := gopacket.NewPacket(aData, layers.LinkTypeIEEE802_11, gopacket.NoCopy)
+
+						checkLayers(p, []gopacket.LayerType{layers.LayerTypeDot11})
+
+						if got, ok := p.Layer(layers.LayerTypeDot11).(*layers.Dot11); ok {
+
+							log.Printf("802.11 packet processed successfully - %v\n", got.Address1)
+
+						}
+
+						log.Println(hex.EncodeToString(aData[24:26]))
+						log.Println(hex.EncodeToString(aData[26:28]))
+						log.Println(hex.EncodeToString(aData[28:30]))
+
+						d := &layers.Dot11MgmtAuthentication{}
+
+						d.DecodeFromBytes(aData[24:], gopacket.NilDecodeFeedback)
+
+						log.Printf("************ %s - %d - %s", d.Algorithm, d.Sequence, d.Status)
+
+						if d.Status == layers.Dot11StatusSuccess && d.Sequence == 2 && d.Algorithm == layers.Dot11AlgorithmOpen {
+							log.Printf("***** successful authentication....proceeding to association\n")
+						}
+
+					} else if aType == unix.NL80211_ATTR_TIMED_OUT {
+						log.Printf("NL80211_CMD_AUTHENTICATE ATTR_TIMED_OUT found\n")
+					} else if aType == unix.NL80211_ATTR_WIPHY_FREQ {
+						log.Printf("NL80211_CMD_AUTHENTICATE NL80211_ATTR_WIPHY_FREQ found\n")
+					} else if aType == unix.NL80211_ATTR_ACK {
+						log.Printf("NL80211_CMD_AUTHENTICATE NL80211_ATTR_ACK found\n")
+					} else if aType == unix.NL80211_ATTR_COOKIE {
+						log.Printf("NL80211_CMD_AUTHENTICATE NL80211_ATTR_COOKIE found\n")
+					} else if aType == unix.NL80211_ATTR_RX_SIGNAL_DBM {
+						log.Printf("NL80211_CMD_AUTHENTICATE NL80211_ATTR_RX_SIGNAL_DBM found\n")
+					} else if aType == unix.NL80211_ATTR_STA_WME {
+						log.Printf("NL80211_CMD_AUTHENTICATE NL80211_ATTR_STA_WME found\n")
+					}
+				}
+
+				if err := ad.Err(); err != nil {
+					log.Printf("processMulticastEvents() NL80211_CMD_AUTHENTICATE attribute deocde error - %s\n", err)
+					continue
+				}
+
+				continue
+			case unix.NL80211_CMD_ASSOCIATE:
+				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_ASSOCIATE\n")
+				// extract params
+				attrs, err := netlink.UnmarshalAttributes(msg.Data)
+				if err != nil {
+					log.Printf("processMulticastEvents() NL80211_CMD_ASSOCIATE error I - %s\n", err)
+					continue
+				}
+
+				for _, a := range attrs {
+					if a.Type == unix.NL80211_ATTR_MAC {
+						log.Printf("NL80211_CMD_ASSOCIATE ATTR_MAC found\n")
+					} else if a.Type == unix.NL80211_ATTR_FRAME {
+						log.Printf("NL80211_CMD_ASSOCIATE ATTR_FRAME found\n")
+
+						if len(a.Data) == 0 {
+							log.Printf("NL80211_CMD_ASSOCIATE ATTR_FRAME no data present\n")
+							continue
+						}
+
+						// parse 802.11 mgmt frame
+						p := gopacket.NewPacket(a.Data, layers.LinkTypeIEEE802_11, gopacket.NoCopy)
+
+						checkLayers(p, []gopacket.LayerType{layers.LayerTypeDot11})
+
+						if got, ok := p.Layer(layers.LayerTypeDot11).(*layers.Dot11); ok {
+
+							log.Printf("802.11 packet processed successfully - %v\n", got.Address1)
+
+						}
+
+					} else if a.Type == unix.NL80211_ATTR_TIMED_OUT {
+						log.Printf("NL80211_CMD_ASSOCIATE ATTR_TIMED_OUT found\n")
+					} else if a.Type == unix.NL80211_ATTR_WIPHY_FREQ {
+						log.Printf("NL80211_CMD_ASSOCIATE NL80211_ATTR_WIPHY_FREQ found\n")
+					} else if a.Type == unix.NL80211_ATTR_ACK {
+						log.Printf("NL80211_CMD_ASSOCIATE NL80211_ATTR_ACK found\n")
+					} else if a.Type == unix.NL80211_ATTR_COOKIE {
+						log.Printf("NL80211_CMD_ASSOCIATE NL80211_ATTR_COOKIE found\n")
+					} else if a.Type == unix.NL80211_ATTR_RX_SIGNAL_DBM {
+						log.Printf("NL80211_CMD_ASSOCIATE NL80211_ATTR_RX_SIGNAL_DBM found\n")
+					} else if a.Type == unix.NL80211_ATTR_STA_WME {
+						log.Printf("NL80211_CMD_ASSOCIATE NL80211_ATTR_STA_WME found\n")
+					}
+				}
+				continue
+			case unix.NL80211_CMD_DEAUTHENTICATE:
+				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_DEAUTHENTICATE\n")
+				continue
+			case unix.NL80211_CMD_DISASSOCIATE:
+				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_DISASSOCIATE\n")
+				continue
+			case unix.NL80211_CMD_FRAME_TX_STATUS:
+				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_FRAME_TX_STATUS\n")
+				continue
+			case unix.NL80211_CMD_FRAME:
+				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_FRAME\n")
+
+				attrs, err := netlink.UnmarshalAttributes(msg.Data)
+				if err != nil {
+					log.Printf("processMulticastEvents() NL80211_CMD_ASSOCIATE error I - %s\n", err)
+					continue
+				}
+
+				for _, a := range attrs {
+					if a.Type == unix.NL80211_ATTR_MAC {
+						log.Printf("NL80211_CMD_ASSOCIATE ATTR_MAC found\n")
+					} else if a.Type == unix.NL80211_ATTR_FRAME {
+						log.Printf("NL80211_CMD_ASSOCIATE ATTR_FRAME found\n")
+					}
+				}
+				continue
+			case unix.NL80211_CMD_CONNECT:
+				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_CONNECT\n")
+
+				attrs, err := netlink.UnmarshalAttributes(msg.Data)
+				if err != nil {
+					log.Printf("processMulticastEvents() NL80211_CMD_CONNECT error I - %s\n", err)
+					continue
+				}
+
+				for _, a := range attrs {
+					if a.Type == unix.NL80211_ATTR_MAC {
+						log.Printf("NL80211_CMD_CONNECT ATTR_MAC found\n")
+					} else if a.Type == unix.NL80211_ATTR_FRAME {
+						log.Printf("NL80211_CMD_CONNECT ATTR_FRAME found\n")
+					}
+				}
+				continue
 			}
 		}
-	END:
-		return
-	}(informer)
+	}
+}
 
-	// scan starts
-	<-informer
+// List of scan status
 
+// FreqToChannel returns the channel of the specified
+// frequency (in MHz) for the 2.4GHz and 5GHz ranges.
+func FreqToChannel(freq int) int {
+	if freq == 2484 {
+		return 14
+	}
+	if freq < 2484 {
+		return (freq - 2407) / 5
+	}
+	return freq/5 - 1000
+}
+
+func ChannelToFreq5GHz(channel int) int {
+	return (channel + 1000) * 5
+}
+
+func ChannelToFreq2Ghz(channel int) int {
+	if channel == 14 {
+		return 2484
+	}
+	return (channel * 5) + 2407
+}
+
+// https://github.com/mdlayher/wifi/pull/79/commits/34d4e06d4c027d0a5a2aa851148fd1f28db1bbb0
+func (c *client) TriggerScan(ifi *Interface) error {
 	/*
 		// TRIGGER_SCAN
 				msgs, err := c.get(
@@ -373,7 +693,7 @@ func (c *client) TriggerScan(ifi *Interface) error {
 					log.Printf("*************NOTHING NOTHING")
 				}
 	*/
-	_, err = c.get(
+	_, err := c.get(
 		unix.NL80211_CMD_TRIGGER_SCAN,
 		netlink.Acknowledge,
 		ifi,
@@ -382,12 +702,14 @@ func (c *client) TriggerScan(ifi *Interface) error {
 	if err != nil {
 		return err
 	}
-	// wait for kernel to inform the scan status
-	if status := <-informer; status == scan_abort {
-		return errors.New("NL80211 Scan aborted by kernel")
-	}
 
-	log.Printf("SCAN DONE\n")
+	/*
+		// wait for kernel to inform the scan status
+		if status := <-informer; status == scan_abort {
+			return errors.New("NL80211 Scan aborted by kernel")
+		}
+	*/
+	log.Printf("SCAN TRIGGERED\n")
 
 	return nil
 }
@@ -499,13 +821,14 @@ func (c *client) GetWiPhy(ifi *Interface) error {
 	// stations := make([]*StationInfo, len(msgs))
 	for i := range msgs {
 		if _, err = parseWiPhyInfo(msgs[i].Data); err != nil {
-			// log.Println(err)
+			log.Println(err)
 		}
 	}
 
 	return nil
 }
 
+// https://gist.github.com/chrizchow/a507b3a70558672b99c814f80314baff
 func parseWiPhyInfo(b []byte) (*StationInfo, error) {
 	attrs, err := netlink.UnmarshalAttributes(b)
 	if err != nil {
