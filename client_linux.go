@@ -432,6 +432,9 @@ func (c *client) processMulticastEvents() {
 		}
 		for _, msg := range genl_msgs {
 			switch msg.Header.Command {
+			case unix.NL80211_CMD_START_AP:
+				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_START_AP\n")
+				continue
 			case unix.NL80211_CMD_TRIGGER_SCAN:
 				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_TRIGGER_SCAN\n")
 				continue
@@ -651,6 +654,19 @@ func ChannelToFreq2Ghz(channel int) int {
 		return 2484
 	}
 	return (channel * 5) + 2407
+}
+
+func (c *client) StartAP(ifi *Interface, ssid string) error {
+	_, err := c.get(
+		unix.NL80211_CMD_START_AP,
+		netlink.Dump,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			ae.String(unix.NL80211_ATTR_SSID, ssid)
+		},
+	)
+
+	return err
 }
 
 // https://github.com/mdlayher/wifi/pull/79/commits/34d4e06d4c027d0a5a2aa851148fd1f28db1bbb0

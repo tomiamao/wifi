@@ -103,5 +103,9 @@ func (c *Client) TriggerScan(ifi *Interface) error {
 	return c.c.TriggerScan(ifi)
 }
 
+func (c *Client) StartAP(ifi *Interface, ssid string) error {
+	return c.c.StartAP(ifi, ssid)
+}
+
 // ADDITIONS END
 //********************************
