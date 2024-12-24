@@ -663,6 +663,18 @@ func (c *client) StartAP(ifi *Interface, ssid string) error {
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			ae.String(unix.NL80211_ATTR_SSID, ssid)
+			ae.Uint32(unix.NL80211_ATTR_HIDDEN_SSID, uint32(unix.NL80211_HIDDEN_SSID_NOT_IN_USE))
+
+			// ae.String(unix.NL80211_ATTR_BEACON_HEAD, ssid)
+			// ae.String(unix.NL80211_ATTR_BEACON_TAIL, ssid)
+
+			ae.Uint32(unix.NL80211_ATTR_BEACON_INTERVAL, uint32(100)) // 100 TU  ==> 102.4ms
+
+			// About TIM & DTIM ----> https://community.arubanetworks.com/blogs/gstefanick1/2016/01/25/80211-tim-and-dtim-information-elements
+			ae.Uint32(unix.NL80211_ATTR_DTIM_PERIOD, uint32(3)) // A DTIM period field of 3 indicates every third beacon is a DTIM.
+
+			ae.Uint32(unix.NL80211_ATTR_AUTH_TYPE, unix.NL80211_AUTHTYPE_OPEN_SYSTEM)
+
 		},
 	)
 
