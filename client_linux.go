@@ -659,7 +659,7 @@ func ChannelToFreq2Ghz(channel int) int {
 func (c *client) StartAP(ifi *Interface, ssid string) error {
 	_, err := c.get(
 		unix.NL80211_CMD_START_AP,
-		netlink.Dump,
+		netlink.Acknowledge,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			ae.String(unix.NL80211_ATTR_SSID, ssid)
