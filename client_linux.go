@@ -710,11 +710,11 @@ func (b *BeaconHead) SetDSParamIE(channel byte) error {
 func (b BeaconHead) Serialize() []byte {
 	data := make([]byte, 0)
 
-	fc := make([]byte, 0)
+	fc := make([]byte, 2)
 	b.ByteOrder.PutUint16(fc, b.FC)
 	data = append(data, fc...)
 
-	duration := make([]byte, 0)
+	duration := make([]byte, 2)
 	b.ByteOrder.PutUint16(duration, b.Duration)
 	data = append(data, duration...)
 
@@ -722,17 +722,17 @@ func (b BeaconHead) Serialize() []byte {
 	data = append(data, b.SA...)
 	data = append(data, b.BSSID...)
 
-	seqCtrl := make([]byte, 0)
+	seqCtrl := make([]byte, 2)
 	b.ByteOrder.PutUint16(seqCtrl, b.SeqCtlr)
 	data = append(data, seqCtrl...)
 
 	data = append(data, b.Timestamp...)
 
-	beaconInterval := make([]byte, 0)
+	beaconInterval := make([]byte, 2)
 	b.ByteOrder.PutUint16(beaconInterval, b.BeaconInterval)
 	data = append(data, beaconInterval...)
 
-	capabilityInfo := make([]byte, 0)
+	capabilityInfo := make([]byte, 2)
 	b.ByteOrder.PutUint16(capabilityInfo, b.CapabilityInfo)
 	data = append(data, capabilityInfo...)
 
