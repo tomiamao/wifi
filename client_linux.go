@@ -18,6 +18,7 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/josharian/native"
 	"github.com/mdlayher/genetlink"
 	"github.com/mdlayher/netlink"
 	"github.com/mdlayher/netlink/nlenc"
@@ -405,22 +406,6 @@ func checkLayers(p gopacket.Packet, want []gopacket.LayerType) {
 			len(l.LayerContents()), len(l.LayerPayload()))
 	}
 	log.Printf("%v\n", p)
-	if len(layers) < len(want) {
-		log.Printf("  Number of layers mismatch: got %d want %d", len(layers),
-			len(want))
-		return
-	}
-	for i, l := range want {
-		if l == gopacket.LayerTypePayload {
-			// done matching layers
-			return
-		}
-
-		if layers[i].LayerType() != l {
-			log.Printf("  Layer %d mismatch: got %v want %v", i,
-				layers[i].LayerType(), l)
-		}
-	}
 }
 
 func (c *client) processMulticastEvents() {
@@ -497,9 +482,7 @@ func (c *client) processMulticastEvents() {
 						checkLayers(p, []gopacket.LayerType{layers.LayerTypeDot11})
 
 						if got, ok := p.Layer(layers.LayerTypeDot11).(*layers.Dot11); ok {
-
 							log.Printf("802.11 packet processed successfully - %v\n", got.Address1)
-
 						}
 
 						log.Println(hex.EncodeToString(aData[24:26]))
@@ -597,7 +580,7 @@ func (c *client) processMulticastEvents() {
 
 				attrs, err := netlink.UnmarshalAttributes(msg.Data)
 				if err != nil {
-					log.Printf("processMulticastEvents() NL80211_CMD_ASSOCIATE error I - %s\n", err)
+					log.Printf("processMulticastEvents() NL80211_CMD_FRAME error I - %s\n", err)
 					continue
 				}
 
@@ -656,6 +639,161 @@ func ChannelToFreq2Ghz(channel int) int {
 	return (channel * 5) + 2407
 }
 
+type BeaconHead struct {
+	ByteOrder binary.ByteOrder
+	// MAC Header
+	FC       uint16 // Frame Control - length 2
+	Duration uint16 // length 2
+	DA       net.HardwareAddr
+	SA       net.HardwareAddr
+	BSSID    net.HardwareAddr
+	SeqCtlr  uint16 // len 2
+	// Frame Body
+	// Fixed Fields
+	Timestamp      []byte // len 8
+	BeaconInterval uint16 // len 2
+	CapabilityInfo uint16 // len 2
+	// Information Elements (variable length)
+	SSID           []byte
+	SupportedRates []byte // variable
+	DSParamSet     []byte
+}
+
+// rate in Mbps
+func (b *BeaconHead) AppendSupportedRateIE(mandatory bool, rateMbps uint) error {
+	if b.SupportedRates == nil {
+		b.SupportedRates = make([]byte, 0)
+	}
+
+	var mandatoryBit byte = 0
+	if mandatory {
+		mandatoryBit = 0x10
+	}
+	val := mandatoryBit | byte(rateMbps*2)
+
+	if len(b.SupportedRates) > 1 && len(b.SupportedRates) < 3 {
+		return fmt.Errorf("invalid supported rate filed")
+	}
+	if len(b.SupportedRates) == 0 { // no previous supported rates configured
+		b.SupportedRates = append(b.SupportedRates, 0x1, 0x1, val) // element ID, length
+		return nil
+	}
+
+	if len(b.SupportedRates) != int(b.SupportedRates[1]+2) {
+		return fmt.Errorf("invalid supported rate filed - invalid lengths")
+	}
+
+	// increase the current length
+	b.SupportedRates[1]++
+	// append new supported rate
+	b.SupportedRates = append(b.SupportedRates, val)
+
+	return nil
+}
+
+func (b *BeaconHead) SetSSIDIE(ssid string) error {
+	b.SSID = make([]byte, 0)
+
+	b.SSID = append(b.SSID, 0x0, byte(len(ssid))) // element ID, length
+	b.SSID = append(b.SSID, []byte(ssid)...)
+
+	return nil
+}
+
+// used by the 2.4GHz channel. Possbile Channel values range from 1-14, with 7 being the default
+func (b *BeaconHead) SetDSParamIE(channel byte) error {
+	b.DSParamSet = make([]byte, 0)
+	b.DSParamSet = append(b.SSID, 0x3, 0x1, channel) // element ID, length, channel
+	return nil
+}
+
+func (b BeaconHead) Serialize() []byte {
+	data := make([]byte, 0)
+
+	fc := make([]byte, 0)
+	b.ByteOrder.PutUint16(fc, b.FC)
+	data = append(data, fc...)
+
+	duration := make([]byte, 0)
+	b.ByteOrder.PutUint16(duration, b.Duration)
+	data = append(data, duration...)
+
+	data = append(data, b.DA...)
+	data = append(data, b.SA...)
+	data = append(data, b.BSSID...)
+
+	seqCtrl := make([]byte, 0)
+	b.ByteOrder.PutUint16(seqCtrl, b.SeqCtlr)
+	data = append(data, seqCtrl...)
+
+	data = append(data, b.Timestamp...)
+
+	beaconInterval := make([]byte, 0)
+	b.ByteOrder.PutUint16(beaconInterval, b.BeaconInterval)
+	data = append(data, beaconInterval...)
+
+	capabilityInfo := make([]byte, 0)
+	b.ByteOrder.PutUint16(capabilityInfo, b.CapabilityInfo)
+	data = append(data, capabilityInfo...)
+
+	data = append(data, b.SSID...)
+	data = append(data, b.SupportedRates...)
+	data = append(data, b.DSParamSet...)
+
+	return data
+}
+
+type BeaconTail struct {
+	ERP                    []byte
+	ExtendedSupportedRates []byte
+}
+
+func (b *BeaconTail) SetERPIE() error {
+	b.ERP = make([]byte, 0)
+	b.ERP = append(b.ERP, 0x2A, 0x1, 0x4) // element ID, length, set Barker Preamble mode
+	return nil
+}
+
+// rate in Mbps
+func (b *BeaconTail) AppendExtendedSupportedRateIE(mandatory bool, rateMbps uint) error {
+	if b.ExtendedSupportedRates == nil {
+		b.ExtendedSupportedRates = make([]byte, 0)
+	}
+
+	var mandatoryBit byte = 0
+	if mandatory {
+		mandatoryBit = 0x10
+	}
+	val := mandatoryBit | byte(rateMbps*2)
+
+	if len(b.ExtendedSupportedRates) > 1 && len(b.ExtendedSupportedRates) < 3 {
+		return fmt.Errorf("invalid supported rate filed")
+	}
+	if len(b.ExtendedSupportedRates) == 0 { // no previous supported rates configured
+		b.ExtendedSupportedRates = append(b.ExtendedSupportedRates, 0x1, 0x1, val) // element ID, length
+		return nil
+	}
+
+	if len(b.ExtendedSupportedRates) != int(b.ExtendedSupportedRates[1]+2) {
+		return fmt.Errorf("invalid supported rate filed - invalid lengths")
+	}
+
+	// increase the current length
+	b.ExtendedSupportedRates[1]++
+	// append new supported rate
+	b.ExtendedSupportedRates = append(b.ExtendedSupportedRates, val)
+
+	return nil
+}
+
+func (b BeaconTail) Serialize() []byte {
+	data := make([]byte, 0)
+	data = append(data, b.ERP...)
+	data = append(data, b.ExtendedSupportedRates...)
+
+	return data
+}
+
 func (c *client) StartAP(ifi *Interface, ssid string) error {
 	_, err := c.get(
 		unix.NL80211_CMD_START_AP,
@@ -664,11 +802,44 @@ func (c *client) StartAP(ifi *Interface, ssid string) error {
 		func(ae *netlink.AttributeEncoder) {
 			ae.String(unix.NL80211_ATTR_SSID, ssid)
 			ae.Uint32(unix.NL80211_ATTR_HIDDEN_SSID, uint32(unix.NL80211_HIDDEN_SSID_NOT_IN_USE))
-
-			// ae.String(unix.NL80211_ATTR_BEACON_HEAD, ssid)
-			// ae.String(unix.NL80211_ATTR_BEACON_TAIL, ssid)
+			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
 
 			ae.Uint32(unix.NL80211_ATTR_BEACON_INTERVAL, uint32(100)) // 100 TU  ==> 102.4ms
+
+			beaconHead := BeaconHead{
+				ByteOrder: native.Endian,
+				FC:        0x0080, // protocol=0x0, Type=0x0 (mgmt) SubType=0x80 (Beacon), Flags=0x00
+				Duration:  0x0,
+				DA:        net.HardwareAddr{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
+				SA:        ifi.HardwareAddr,
+				BSSID:     ifi.HardwareAddr,
+				SeqCtlr:   0x0,
+				// Frame Body
+				Timestamp:      []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+				BeaconInterval: 0x0064,
+				CapabilityInfo: 0x401, // bits set: ESS, Short Slot time
+			}
+			(&beaconHead).SetSSIDIE(ssid)
+			(&beaconHead).AppendSupportedRateIE(true, 1)   // madatory 1Mbps
+			(&beaconHead).AppendSupportedRateIE(true, 2)   // madatory 2Mbps
+			(&beaconHead).AppendSupportedRateIE(true, 11)  // madatory 11Mbps
+			(&beaconHead).AppendSupportedRateIE(false, 6)  // optional 6Mbps
+			(&beaconHead).AppendSupportedRateIE(false, 9)  // optional 9Mbps
+			(&beaconHead).AppendSupportedRateIE(false, 12) // optional 12Mbps
+			(&beaconHead).AppendSupportedRateIE(false, 18) // optional 18Mbps
+			(&beaconHead).SetDSParamIE(7)                  // use channel 7 in the 2.4GHz spectrum
+			ae.Bytes(unix.NL80211_ATTR_BEACON_HEAD, beaconHead.Serialize())
+
+			beaconTail := BeaconTail{}
+			(&beaconTail).SetERPIE()
+			(&beaconTail).AppendExtendedSupportedRateIE(false, 24) // optional 24Mbps
+			(&beaconTail).AppendExtendedSupportedRateIE(false, 36) // optional 36Mbps
+			(&beaconTail).AppendExtendedSupportedRateIE(false, 48) // optional 48Mbps
+			(&beaconTail).AppendExtendedSupportedRateIE(false, 54) // optional 54Mbps
+			ae.Bytes(unix.NL80211_ATTR_BEACON_TAIL, beaconTail.Serialize())
+
+			// ae.Bytes(unix.NL80211_ATTR_IE_PROBE_RESP, uint32(100))
+			// ae.Bytes(unix.NL80211_ATTR_IE_ASSOC_RESP, uint32(100))
 
 			// About TIM & DTIM ----> https://community.arubanetworks.com/blogs/gstefanick1/2016/01/25/80211-tim-and-dtim-information-elements
 			ae.Uint32(unix.NL80211_ATTR_DTIM_PERIOD, uint32(3)) // A DTIM period field of 3 indicates every third beacon is a DTIM.
