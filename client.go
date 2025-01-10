@@ -95,16 +95,36 @@ func (c *Client) GetWiPhy(ifi *Interface) error {
 	return c.c.GetWiPhy(ifi)
 }
 
+func (c *Client) SetWiPhy(ifi *Interface, freq uint32) error {
+	return c.c.SetWiPhy(ifi, freq)
+}
+
 func (c *Client) AllBSS(ifi *Interface) ([]*BSS, error) {
 	return c.c.AllBSS(ifi)
+}
+
+func (c *Client) SetBSS(ifi *Interface) error {
+	return c.c.SetBSS(ifi)
 }
 
 func (c *Client) TriggerScan(ifi *Interface) error {
 	return c.c.TriggerScan(ifi)
 }
 
-func (c *Client) StartAP(ifi *Interface, ssid string) error {
-	return c.c.StartAP(ifi, ssid)
+func (c *Client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
+	return c.c.StartAP(ifi, ssid, freqChannel)
+}
+
+func (c *Client) RegisterBeacons(ifi *Interface) error {
+	return c.c.RegisterBeacons(ifi)
+}
+
+func (c *Client) SetMulticastToUnicast(ifi *Interface) error {
+	return c.c.SetMulticastToUnicast(ifi)
+}
+
+func (c *Client) GetInterface(ifi *Interface) error {
+	return c.c.GetInterface(ifi)
 }
 
 // ADDITIONS END

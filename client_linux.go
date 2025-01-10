@@ -793,18 +793,14 @@ func (b BeaconTail) Serialize() []byte {
 	return data
 }
 
-func (c *client) StartAP(ifi *Interface, ssid string) error {
+// use channel 6 in the 2.4GHz spectrum - specify 6 for freqChannel
+func (c *client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
 	_, err := c.get(
 		unix.NL80211_CMD_START_AP,
 		netlink.Acknowledge,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
-			ae.Bytes(unix.NL80211_ATTR_SSID, []byte(ssid))
-			ae.Uint32(unix.NL80211_ATTR_HIDDEN_SSID, uint32(unix.NL80211_HIDDEN_SSID_NOT_IN_USE))
 			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
-
-			ae.Uint32(unix.NL80211_ATTR_BEACON_INTERVAL, uint32(100)) // 100 TU  ==> 102.4ms
-
 			beaconHead := BeaconHead{
 				ByteOrder: native.Endian,
 				FC:        0x0080, // protocol=0x0, Type=0x0 (mgmt) SubType=0x80 (Beacon), Flags=0x00
@@ -816,7 +812,7 @@ func (c *client) StartAP(ifi *Interface, ssid string) error {
 				// Frame Body
 				Timestamp:      []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 				BeaconInterval: 0x0064,
-				CapabilityInfo: 0x401, // bits set: ESS, Short Slot time
+				CapabilityInfo: 0x411, // bits set: ESS, Short Slot time
 			}
 			(&beaconHead).SetSSIDIE(ssid)
 			(&beaconHead).AppendSupportedRateIE(true, 1)   // madatory 1Mbps
@@ -826,7 +822,7 @@ func (c *client) StartAP(ifi *Interface, ssid string) error {
 			(&beaconHead).AppendSupportedRateIE(false, 9)  // optional 9Mbps
 			(&beaconHead).AppendSupportedRateIE(false, 12) // optional 12Mbps
 			(&beaconHead).AppendSupportedRateIE(false, 18) // optional 18Mbps
-			(&beaconHead).SetDSParamIE(7)                  // use channel 7 in the 2.4GHz spectrum
+			(&beaconHead).SetDSParamIE(freqChannel)
 			ae.Bytes(unix.NL80211_ATTR_BEACON_HEAD, beaconHead.Serialize())
 
 			beaconTail := BeaconTail{}
@@ -837,14 +833,22 @@ func (c *client) StartAP(ifi *Interface, ssid string) error {
 			(&beaconTail).AppendExtendedSupportedRateIE(false, 54) // optional 54Mbps
 			ae.Bytes(unix.NL80211_ATTR_BEACON_TAIL, beaconTail.Serialize())
 
-			// ae.Bytes(unix.NL80211_ATTR_IE_PROBE_RESP, uint32(100))
-			// ae.Bytes(unix.NL80211_ATTR_IE_ASSOC_RESP, uint32(100))
+			ae.Bytes(unix.NL80211_ATTR_SSID, []byte(ssid))
+			ae.Uint32(unix.NL80211_ATTR_HIDDEN_SSID, uint32(unix.NL80211_HIDDEN_SSID_NOT_IN_USE))
+
+			ae.Uint32(unix.NL80211_ATTR_BEACON_INTERVAL, uint32(100)) // 100 TU  ==> 102.4ms
 
 			// About TIM & DTIM ----> https://community.arubanetworks.com/blogs/gstefanick1/2016/01/25/80211-tim-and-dtim-information-elements
-			ae.Uint32(unix.NL80211_ATTR_DTIM_PERIOD, uint32(3)) // A DTIM period field of 3 indicates every third beacon is a DTIM.
+			ae.Uint32(unix.NL80211_ATTR_DTIM_PERIOD, uint32(2)) // A DTIM period field of 2 indicates every 2nd beacon is a DTIM.
 
 			ae.Uint32(unix.NL80211_ATTR_AUTH_TYPE, unix.NL80211_AUTHTYPE_OPEN_SYSTEM)
 
+			ae.Flag(unix.NL80211_ATTR_PRIVACY, true)
+
+			// TODO: figure out what these values mean
+			ae.Bytes(unix.NL80211_ATTR_IE, []byte{0x7F, 0x08, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
+			ae.Bytes(unix.NL80211_ATTR_IE_PROBE_RESP, []byte{0x7F, 0x08, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
+			ae.Bytes(unix.NL80211_ATTR_IE_ASSOC_RESP, []byte{0x7F, 0x08, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
 		},
 	)
 
@@ -994,6 +998,104 @@ func parseAllBSS(msgs []genetlink.Message) ([]*BSS, error) {
 		all_bss = append(all_bss, &bss)
 	}
 	return all_bss, nil
+}
+
+func (c *client) SetBSS(ifi *Interface) error {
+	_, err := c.get(
+		unix.NL80211_CMD_REGISTER_BEACONS,
+		netlink.Dump,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
+			ae.Uint8(unix.NL80211_ATTR_BSS_CTS_PROT, 0x0)
+			ae.Uint8(unix.NL80211_ATTR_BSS_SHORT_PREAMBLE, 0x0)
+			ae.Uint8(unix.NL80211_ATTR_BSS_SHORT_SLOT_TIME, 0x1)
+			ae.Uint8(unix.NL80211_ATTR_AP_ISOLATE, 0x0)
+			ae.Uint32(unix.NL80211_ATTR_BSS_BASIC_RATES, 0x160b0402)
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *client) SetMulticastToUnicast(ifi *Interface) error {
+	_, err := c.get(
+		unix.NL80211_CMD_SET_MULTICAST_TO_UNICAST,
+		netlink.Dump,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *client) RegisterBeacons(ifi *Interface) error {
+	_, err := c.get(
+		unix.NL80211_CMD_REGISTER_BEACONS,
+		netlink.Dump,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			ae.Uint32(unix.NL80211_ATTR_WIPHY, 0x0)
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *client) GetInterface(ifi *Interface) error {
+	msgs, err := c.get(
+		unix.NL80211_CMD_GET_INTERFACE,
+		netlink.Dump,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("Printing MULTICAST Groups\n")
+	for _, v := range c.groups {
+		log.Printf("%s - %d\n", v.Name, v.ID)
+	}
+
+	log.Printf("these many messages recvd: %d\n", len(msgs))
+
+	if _, err = parseInterfaces(msgs); err != nil {
+		log.Println(err)
+	}
+
+	return nil
+}
+
+func (c *client) SetWiPhy(ifi *Interface, freq uint32) error {
+	_, err := c.get(
+		unix.NL80211_CMD_SET_WIPHY,
+		netlink.Dump,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
+			ae.Uint32(unix.NL80211_ATTR_WIPHY_FREQ, freq)
+			ae.Uint32(unix.NL80211_ATTR_WIPHY_CHANNEL_TYPE, 0x0)
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (c *client) GetWiPhy(ifi *Interface) error {
