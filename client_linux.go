@@ -916,6 +916,33 @@ func (c *client) SetBeacon(ifi *Interface, ssid string, freqChannel byte) error 
 	return err
 }
 
+func (c *client) GetInterface(ifi *Interface) error {
+	msgs, err := c.get(
+		unix.NL80211_CMD_GET_INTERFACE,
+		netlink.Acknowledge,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	intfs, err := parseInterfaces(msgs)
+	if err != nil {
+		log.Println(err)
+	}
+
+	log.Printf("These many interfaces found: %d\n", len(intfs))
+
+	for _, v := range intfs {
+		log.Printf("GetInterface %s - %s - %s -%d - %d", v.Name, v.Type, v.HardwareAddr.String(), v.Frequency, v.PHY)
+	}
+
+	return nil
+}
+
 func (c *client) SetInterfaceToAPMode(ifi *Interface) error {
 	_, err := c.get(
 		unix.NL80211_CMD_SET_INTERFACE,
@@ -1126,40 +1153,6 @@ func (c *client) RegisterBeacons(ifi *Interface) error {
 	)
 	if err != nil {
 		return err
-	}
-
-	return nil
-}
-
-func (c *client) GetInterface(ifi *Interface) error {
-	msgs, err := c.get(
-		unix.NL80211_CMD_GET_INTERFACE,
-		netlink.Acknowledge,
-		ifi,
-		func(ae *netlink.AttributeEncoder) {
-			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
-		},
-	)
-	if err != nil {
-		return err
-	}
-
-	log.Printf("Printing MULTICAST Groups\n")
-	for _, v := range c.groups {
-		log.Printf("%s - %d\n", v.Name, v.ID)
-	}
-
-	log.Printf("these many messages recvd: %d\n", len(msgs))
-
-	intfs, err := parseInterfaces(msgs)
-	if err != nil {
-		log.Println(err)
-	}
-
-	log.Printf("These many interfaces found: %d\n", len(intfs))
-
-	for _, v := range intfs {
-		log.Printf("GetInterface %s - %s - %s -%d - %d", v.Name, v.Type, v.HardwareAddr.String(), v.Frequency, v.PHY)
 	}
 
 	return nil
