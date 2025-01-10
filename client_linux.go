@@ -1151,8 +1151,15 @@ func (c *client) GetInterface(ifi *Interface) error {
 
 	log.Printf("these many messages recvd: %d\n", len(msgs))
 
-	if _, err = parseInterfaces(msgs); err != nil {
+	intfs, err := parseInterfaces(msgs)
+	if err != nil {
 		log.Println(err)
+	}
+
+	log.Printf("These many interfaces found: %d\n", len(intfs))
+
+	for _, v := range intfs {
+		log.Printf("GetInterface %s - %s - %s -%d - %d", v.Name, v.Type, v.HardwareAddr.String(), v.Frequency, v.PHY)
 	}
 
 	return nil
