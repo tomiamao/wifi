@@ -131,5 +131,9 @@ func (c *Client) GetInterface(ifi *Interface) error {
 	return c.c.GetInterface(ifi)
 }
 
+func (c *Client) SetInterface(ifi *Interface) error {
+	return c.c.SetInterfaceToAPMode(ifi)
+}
+
 // ADDITIONS END
 //********************************

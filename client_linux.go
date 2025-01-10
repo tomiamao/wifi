@@ -916,6 +916,23 @@ func (c *client) SetBeacon(ifi *Interface, ssid string, freqChannel byte) error 
 	return err
 }
 
+func (c *client) SetInterfaceToAPMode(ifi *Interface) error {
+	_, err := c.get(
+		unix.NL80211_CMD_SET_INTERFACE,
+		netlink.Dump,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
+			ae.Uint32(unix.NL80211_ATTR_IFTYPE, unix.NL80211_IFTYPE_AP)
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // https://github.com/mdlayher/wifi/pull/79/commits/34d4e06d4c027d0a5a2aa851148fd1f28db1bbb0
 func (c *client) TriggerScan(ifi *Interface) error {
 	/*
