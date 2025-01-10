@@ -799,7 +799,7 @@ func (c *client) StartAP(ifi *Interface, ssid string) error {
 		netlink.Acknowledge,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
-			ae.String(unix.NL80211_ATTR_SSID, ssid)
+			ae.Bytes(unix.NL80211_ATTR_SSID, []byte(ssid))
 			ae.Uint32(unix.NL80211_ATTR_HIDDEN_SSID, uint32(unix.NL80211_HIDDEN_SSID_NOT_IN_USE))
 			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
 
