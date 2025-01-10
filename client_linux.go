@@ -736,7 +736,6 @@ func (b BeaconHead) Serialize() []byte {
 	b.ByteOrder.PutUint16(capabilityInfo, b.CapabilityInfo)
 	data = append(data, capabilityInfo...)
 
-	data = append(data, b.SSID...)
 	data = append(data, b.SupportedRates...)
 	data = append(data, b.DSParamSet...)
 
