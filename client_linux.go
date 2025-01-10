@@ -1081,7 +1081,7 @@ func parseAllBSS(msgs []genetlink.Message) ([]*BSS, error) {
 func (c *client) SetBSS(ifi *Interface) error {
 	_, err := c.get(
 		unix.NL80211_CMD_REGISTER_BEACONS,
-		netlink.Dump,
+		netlink.Acknowledge,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
@@ -1102,7 +1102,7 @@ func (c *client) SetBSS(ifi *Interface) error {
 func (c *client) SetMulticastToUnicast(ifi *Interface) error {
 	_, err := c.get(
 		unix.NL80211_CMD_SET_MULTICAST_TO_UNICAST,
-		netlink.Dump,
+		netlink.Acknowledge,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
@@ -1118,7 +1118,7 @@ func (c *client) SetMulticastToUnicast(ifi *Interface) error {
 func (c *client) RegisterBeacons(ifi *Interface) error {
 	_, err := c.get(
 		unix.NL80211_CMD_REGISTER_BEACONS,
-		netlink.Dump,
+		netlink.Acknowledge,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			ae.Uint32(unix.NL80211_ATTR_WIPHY, 0x0)
@@ -1134,7 +1134,7 @@ func (c *client) RegisterBeacons(ifi *Interface) error {
 func (c *client) GetInterface(ifi *Interface) error {
 	msgs, err := c.get(
 		unix.NL80211_CMD_GET_INTERFACE,
-		netlink.Dump,
+		netlink.Acknowledge,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
@@ -1168,7 +1168,7 @@ func (c *client) GetInterface(ifi *Interface) error {
 func (c *client) SetWiPhy(ifi *Interface, freq uint32) error {
 	_, err := c.get(
 		unix.NL80211_CMD_SET_WIPHY,
-		netlink.Dump,
+		netlink.Acknowledge,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
