@@ -793,6 +793,19 @@ func (b BeaconTail) Serialize() []byte {
 	return data
 }
 
+func (c *client) StopAP(ifi *Interface) error {
+	_, err := c.get(
+		unix.NL80211_CMD_STOP_AP,
+		netlink.Acknowledge,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
+		},
+	)
+
+	return err
+}
+
 // use channel 6 in the 2.4GHz spectrum - specify 6 for freqChannel
 func (c *client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
 	_, err := c.get(

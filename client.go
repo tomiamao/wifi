@@ -115,6 +115,10 @@ func (c *Client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
 	return c.c.StartAP(ifi, ssid, freqChannel)
 }
 
+func (c *Client) StopAP(ifi *Interface) error {
+	return c.c.StopAP(ifi)
+}
+
 func (c *Client) SetBeacon(ifi *Interface, ssid string, freqChannel byte) error {
 	return c.c.SetBeacon(ifi, ssid, freqChannel)
 }
