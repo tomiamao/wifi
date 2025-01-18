@@ -919,7 +919,7 @@ func (c *client) SetBeacon(ifi *Interface, ssid string, freqChannel byte) error 
 func (c *client) GetInterface(ifi *Interface) error {
 	msgs, err := c.get(
 		unix.NL80211_CMD_GET_INTERFACE,
-		netlink.Acknowledge,
+		0,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
