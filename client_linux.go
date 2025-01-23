@@ -929,17 +929,18 @@ func (c *client) SetBeacon(ifi *Interface, ssid string, freqChannel byte) error 
 	return err
 }
 
-func (c *client) GetInterface(ifi *Interface) error {
+func (c *client) GetInterface(ifi *Interface) ([]*Interface, error) {
 	msgs, err := c.get(
 		unix.NL80211_CMD_GET_INTERFACE,
 		0,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
-			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
+			// seems to be automatically set by the bibrary
+			// ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
 		},
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	intfs, err := parseInterfaces(msgs)
@@ -947,13 +948,7 @@ func (c *client) GetInterface(ifi *Interface) error {
 		log.Println(err)
 	}
 
-	log.Printf("These many interfaces found: %d\n", len(intfs))
-
-	for _, v := range intfs {
-		log.Printf("GetInterface %s - %s - %s -%d - %d", v.Name, v.Type, v.HardwareAddr.String(), v.Frequency, v.PHY)
-	}
-
-	return nil
+	return intfs, nil
 }
 
 func (c *client) SetInterfaceToAPMode(ifi *Interface) error {
@@ -962,7 +957,7 @@ func (c *client) SetInterfaceToAPMode(ifi *Interface) error {
 		netlink.Acknowledge,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
-			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
+			// ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
 			ae.Uint32(unix.NL80211_ATTR_IFTYPE, unix.NL80211_IFTYPE_AP)
 		},
 	)

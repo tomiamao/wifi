@@ -131,7 +131,7 @@ func (c *Client) SetMulticastToUnicast(ifi *Interface) error {
 	return c.c.SetMulticastToUnicast(ifi)
 }
 
-func (c *Client) GetInterface(ifi *Interface) error {
+func (c *Client) GetInterface(ifi *Interface) ([]*Interface, error) {
 	return c.c.GetInterface(ifi)
 }
 
