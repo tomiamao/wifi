@@ -1065,6 +1065,23 @@ found:
 	return (features[feature/8]&(1<<(feature%8)) != 0), nil
 }
 
+func (c *client) RegisterFrame(ifi *Interface, frameType uint16, frameMatch []byte) error {
+	_, err := c.get(
+		unix.NL80211_CMD_REGISTER_FRAME,
+		netlink.Acknowledge,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			ae.Uint16(unix.NL80211_ATTR_FRAME_TYPE, frameType)
+			ae.Bytes(unix.NL80211_ATTR_FRAME_MATCH, frameMatch)
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // AllBSS requests that nl80211 return all the BSS around the specified Interface.
 func (c *client) AllBSS(ifi *Interface) ([]*BSS, error) {
 	msgs, err := c.get(
