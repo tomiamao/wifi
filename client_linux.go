@@ -811,7 +811,7 @@ func (c *client) DeleteKey(ifi *Interface, keyIdx uint8) error {
 		netlink.Acknowledge,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
-			ae.Uint8(unix.NL80211_ATTR_IFINDEX, keyIdx)
+			ae.Uint8(unix.NL80211_ATTR_KEY_IDX, keyIdx)
 		},
 	)
 
