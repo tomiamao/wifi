@@ -137,6 +137,14 @@ func (c *Client) SetMulticastToUnicast(ifi *Interface) error {
 	return c.c.SetMulticastToUnicast(ifi)
 }
 
+func (c *Client) DeleteStation(ifi *Interface) error {
+	return c.c.DeleteStation(ifi)
+}
+
+func (c *Client) DeleteKey(ifi *Interface, keyIdx uint8) error {
+	return c.c.DeleteKey(ifi, keyIdx)
+}
+
 func (c *Client) GetInterface(ifi *Interface) ([]*Interface, error) {
 	return c.c.GetInterface(ifi)
 }

@@ -793,6 +793,31 @@ func (b BeaconTail) Serialize() []byte {
 	return data
 }
 
+func (c *client) DeleteStation(ifi *Interface) error {
+	_, err := c.get(
+		unix.NL80211_CMD_DEL_STATION,
+		netlink.Acknowledge,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+		},
+	)
+
+	return err
+}
+
+func (c *client) DeleteKey(ifi *Interface, keyIdx uint8) error {
+	_, err := c.get(
+		unix.NL80211_CMD_DEL_KEY,
+		netlink.Acknowledge,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			ae.Uint8(unix.NL80211_ATTR_IFINDEX, keyIdx)
+		},
+	)
+
+	return err
+}
+
 func (c *client) StopAP(ifi *Interface) error {
 	_, err := c.get(
 		unix.NL80211_CMD_STOP_AP,
