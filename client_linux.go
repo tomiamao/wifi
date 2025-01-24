@@ -1175,11 +1175,10 @@ func parseAllBSS(msgs []genetlink.Message) ([]*BSS, error) {
 
 func (c *client) SetBSS(ifi *Interface) error {
 	_, err := c.get(
-		unix.NL80211_CMD_REGISTER_BEACONS,
+		unix.NL80211_CMD_SET_BSS,
 		netlink.Acknowledge,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
-			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
 			ae.Uint8(unix.NL80211_ATTR_BSS_CTS_PROT, 0x0)
 			ae.Uint8(unix.NL80211_ATTR_BSS_SHORT_PREAMBLE, 0x0)
 			ae.Uint8(unix.NL80211_ATTR_BSS_SHORT_SLOT_TIME, 0x1)
