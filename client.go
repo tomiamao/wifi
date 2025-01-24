@@ -3,6 +3,8 @@ package wifi
 import (
 	"net"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 // A Client is a type which can access WiFi device actions and statistics
@@ -139,8 +141,12 @@ func (c *Client) GetInterface(ifi *Interface) ([]*Interface, error) {
 	return c.c.GetInterface(ifi)
 }
 
-func (c *Client) SetInterface(ifi *Interface) error {
-	return c.c.SetInterfaceToAPMode(ifi)
+func (c *Client) SetInterfaceToAPMode(ifi *Interface) error {
+	// return c.c.SetInterfaceToAPMode(ifi)
+	return c.c.SetInterfaceMode(ifi, unix.NL80211_IFTYPE_AP)
+}
+func (c *Client) SetInterfaceToStationMode(ifi *Interface) error {
+	return c.c.SetInterfaceMode(ifi, unix.NL80211_IFTYPE_STATION)
 }
 
 // ADDITIONS END

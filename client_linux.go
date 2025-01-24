@@ -951,6 +951,7 @@ func (c *client) GetInterface(ifi *Interface) ([]*Interface, error) {
 	return intfs, nil
 }
 
+/*
 func (c *client) SetInterfaceToAPMode(ifi *Interface) error {
 	_, err := c.get(
 		unix.NL80211_CMD_SET_INTERFACE,
@@ -959,6 +960,23 @@ func (c *client) SetInterfaceToAPMode(ifi *Interface) error {
 		func(ae *netlink.AttributeEncoder) {
 			// ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
 			ae.Uint32(unix.NL80211_ATTR_IFTYPE, unix.NL80211_IFTYPE_AP)
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+*/
+
+func (c *client) SetInterfaceMode(ifi *Interface, mode uint32) error {
+	_, err := c.get(
+		unix.NL80211_CMD_SET_INTERFACE,
+		netlink.Acknowledge,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			ae.Uint32(unix.NL80211_ATTR_IFTYPE, mode)
 		},
 	)
 	if err != nil {
