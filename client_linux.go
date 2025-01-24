@@ -856,7 +856,7 @@ func (c *client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
 
 			ae.Uint32(unix.NL80211_ATTR_AUTH_TYPE, unix.NL80211_AUTHTYPE_OPEN_SYSTEM)
 
-			ae.Flag(unix.NL80211_ATTR_PRIVACY, true)
+			// ae.Flag(unix.NL80211_ATTR_PRIVACY, true)
 
 			// TODO: figure out what these values mean
 			ae.Bytes(unix.NL80211_ATTR_IE, []byte{0x7F, 0x08, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
