@@ -436,13 +436,17 @@ func checkLayers(p gopacket.Packet, want []gopacket.LayerType) {
 
 func (c *client) processMulticastEvents() {
 	for {
-		log.Println("WAITING FOR MULTICAST MESSAGES")
 		genl_msgs, _, err := c.multicastConn.Receive()
 		if err != nil {
 			log.Printf("netlink multicast event receive failed - %s\n", err)
 			return
 		}
+
+		log.Printf("Received %d multicast messages...about to process them\n", len(genl_msgs))
+
 		for _, msg := range genl_msgs {
+			log.Printf("Multicast message with %d Command Received\n", msg.Header.Command)
+
 			switch msg.Header.Command {
 			case unix.NL80211_CMD_START_AP:
 				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_START_AP\n")
