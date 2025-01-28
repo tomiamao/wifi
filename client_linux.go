@@ -879,7 +879,7 @@ func (c *client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
 			// About TIM & DTIM ----> https://community.arubanetworks.com/blogs/gstefanick1/2016/01/25/80211-tim-and-dtim-information-elements
 			ae.Uint32(unix.NL80211_ATTR_DTIM_PERIOD, uint32(2)) // A DTIM period field of 2 indicates every 2nd beacon is a DTIM.
 
-			// ae.Uint32(unix.NL80211_ATTR_AUTH_TYPE, unix.NL80211_AUTHTYPE_OPEN_SYSTEM)
+			ae.Uint32(unix.NL80211_ATTR_AUTH_TYPE, unix.NL80211_AUTHTYPE_OPEN_SYSTEM)
 
 			// ae.Flag(unix.NL80211_ATTR_PRIVACY, true)
 
@@ -894,64 +894,67 @@ func (c *client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
 }
 
 func (c *client) SetBeacon(ifi *Interface, ssid string, freqChannel byte) error {
-	_, err := c.get(
-		unix.NL80211_CMD_SET_BEACON,
-		netlink.Acknowledge,
-		ifi,
-		func(ae *netlink.AttributeEncoder) {
-			// ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
-			beaconHead := BeaconHead{
-				ByteOrder: native.Endian,
-				FC:        0x0080, // protocol=0x0, Type=0x0 (mgmt) SubType=0x80 (Beacon), Flags=0x00
-				Duration:  0x0,
-				DA:        net.HardwareAddr{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
-				SA:        ifi.HardwareAddr,
-				BSSID:     ifi.HardwareAddr,
-				SeqCtlr:   0x0,
-				// Frame Body
-				Timestamp:      []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
-				BeaconInterval: 0x0064,
-				CapabilityInfo: 0x411, // bits set: ESS, Short Slot time
-			}
-			(&beaconHead).SetSSIDIE(ssid)
-			(&beaconHead).AppendSupportedRateIE(true, 1)   // madatory 1Mbps
-			(&beaconHead).AppendSupportedRateIE(true, 2)   // madatory 2Mbps
-			(&beaconHead).AppendSupportedRateIE(true, 11)  // madatory 11Mbps
-			(&beaconHead).AppendSupportedRateIE(false, 6)  // optional 6Mbps
-			(&beaconHead).AppendSupportedRateIE(false, 9)  // optional 9Mbps
-			(&beaconHead).AppendSupportedRateIE(false, 12) // optional 12Mbps
-			(&beaconHead).AppendSupportedRateIE(false, 18) // optional 18Mbps
-			(&beaconHead).SetDSParamIE(freqChannel)
-			ae.Bytes(unix.NL80211_ATTR_BEACON_HEAD, beaconHead.Serialize())
+	return c.StartAP(ifi, ssid, freqChannel)
+	/*
+		_, err := c.get(
+			unix.NL80211_CMD_SET_BEACON,
+			netlink.Acknowledge,
+			ifi,
+			func(ae *netlink.AttributeEncoder) {
+				// ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
+				beaconHead := BeaconHead{
+					ByteOrder: native.Endian,
+					FC:        0x0080, // protocol=0x0, Type=0x0 (mgmt) SubType=0x80 (Beacon), Flags=0x00
+					Duration:  0x0,
+					DA:        net.HardwareAddr{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
+					SA:        ifi.HardwareAddr,
+					BSSID:     ifi.HardwareAddr,
+					SeqCtlr:   0x0,
+					// Frame Body
+					Timestamp:      []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+					BeaconInterval: 0x0064,
+					CapabilityInfo: 0x411, // bits set: ESS, Short Slot time
+				}
+				(&beaconHead).SetSSIDIE(ssid)
+				(&beaconHead).AppendSupportedRateIE(true, 1)   // madatory 1Mbps
+				(&beaconHead).AppendSupportedRateIE(true, 2)   // madatory 2Mbps
+				(&beaconHead).AppendSupportedRateIE(true, 11)  // madatory 11Mbps
+				(&beaconHead).AppendSupportedRateIE(false, 6)  // optional 6Mbps
+				(&beaconHead).AppendSupportedRateIE(false, 9)  // optional 9Mbps
+				(&beaconHead).AppendSupportedRateIE(false, 12) // optional 12Mbps
+				(&beaconHead).AppendSupportedRateIE(false, 18) // optional 18Mbps
+				(&beaconHead).SetDSParamIE(freqChannel)
+				ae.Bytes(unix.NL80211_ATTR_BEACON_HEAD, beaconHead.Serialize())
 
-			beaconTail := BeaconTail{}
-			(&beaconTail).SetERPIE()
-			(&beaconTail).AppendExtendedSupportedRateIE(false, 24) // optional 24Mbps
-			(&beaconTail).AppendExtendedSupportedRateIE(false, 36) // optional 36Mbps
-			(&beaconTail).AppendExtendedSupportedRateIE(false, 48) // optional 48Mbps
-			(&beaconTail).AppendExtendedSupportedRateIE(false, 54) // optional 54Mbps
-			ae.Bytes(unix.NL80211_ATTR_BEACON_TAIL, beaconTail.Serialize())
+				beaconTail := BeaconTail{}
+				(&beaconTail).SetERPIE()
+				(&beaconTail).AppendExtendedSupportedRateIE(false, 24) // optional 24Mbps
+				(&beaconTail).AppendExtendedSupportedRateIE(false, 36) // optional 36Mbps
+				(&beaconTail).AppendExtendedSupportedRateIE(false, 48) // optional 48Mbps
+				(&beaconTail).AppendExtendedSupportedRateIE(false, 54) // optional 54Mbps
+				ae.Bytes(unix.NL80211_ATTR_BEACON_TAIL, beaconTail.Serialize())
 
-			ae.Bytes(unix.NL80211_ATTR_SSID, []byte(ssid))
-			ae.Uint32(unix.NL80211_ATTR_HIDDEN_SSID, uint32(unix.NL80211_HIDDEN_SSID_NOT_IN_USE))
+				ae.Bytes(unix.NL80211_ATTR_SSID, []byte(ssid))
+				ae.Uint32(unix.NL80211_ATTR_HIDDEN_SSID, uint32(unix.NL80211_HIDDEN_SSID_NOT_IN_USE))
 
-			ae.Uint32(unix.NL80211_ATTR_BEACON_INTERVAL, uint32(100)) // 100 TU  ==> 102.4ms
+				ae.Uint32(unix.NL80211_ATTR_BEACON_INTERVAL, uint32(100)) // 100 TU  ==> 102.4ms
 
-			// About TIM & DTIM ----> https://community.arubanetworks.com/blogs/gstefanick1/2016/01/25/80211-tim-and-dtim-information-elements
-			ae.Uint32(unix.NL80211_ATTR_DTIM_PERIOD, uint32(2)) // A DTIM period field of 2 indicates every 2nd beacon is a DTIM.
+				// About TIM & DTIM ----> https://community.arubanetworks.com/blogs/gstefanick1/2016/01/25/80211-tim-and-dtim-information-elements
+				ae.Uint32(unix.NL80211_ATTR_DTIM_PERIOD, uint32(2)) // A DTIM period field of 2 indicates every 2nd beacon is a DTIM.
 
-			// ae.Uint32(unix.NL80211_ATTR_AUTH_TYPE, unix.NL80211_AUTHTYPE_OPEN_SYSTEM)
+				// ae.Uint32(unix.NL80211_ATTR_AUTH_TYPE, unix.NL80211_AUTHTYPE_OPEN_SYSTEM)
 
-			// ae.Flag(unix.NL80211_ATTR_PRIVACY, true)
+				// ae.Flag(unix.NL80211_ATTR_PRIVACY, true)
 
-			// TODO: figure out what these values mean
-			ae.Bytes(unix.NL80211_ATTR_IE, []byte{0x7F, 0x08, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
-			ae.Bytes(unix.NL80211_ATTR_IE_PROBE_RESP, []byte{0x7F, 0x08, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
-			ae.Bytes(unix.NL80211_ATTR_IE_ASSOC_RESP, []byte{0x7F, 0x08, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
-		},
-	)
+				// TODO: figure out what these values mean
+				ae.Bytes(unix.NL80211_ATTR_IE, []byte{0x7F, 0x08, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
+				ae.Bytes(unix.NL80211_ATTR_IE_PROBE_RESP, []byte{0x7F, 0x08, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
+				ae.Bytes(unix.NL80211_ATTR_IE_ASSOC_RESP, []byte{0x7F, 0x08, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
+			},
+		)
 
-	return err
+		return err
+	*/
 }
 
 func (c *client) GetInterface(ifi *Interface) ([]*Interface, error) {
