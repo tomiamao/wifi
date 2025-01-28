@@ -899,7 +899,7 @@ func (c *client) SetBeacon(ifi *Interface, ssid string, freqChannel byte) error 
 		netlink.Acknowledge,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
-			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
+			// ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
 			beaconHead := BeaconHead{
 				ByteOrder: native.Endian,
 				FC:        0x0080, // protocol=0x0, Type=0x0 (mgmt) SubType=0x80 (Beacon), Flags=0x00
@@ -940,9 +940,9 @@ func (c *client) SetBeacon(ifi *Interface, ssid string, freqChannel byte) error 
 			// About TIM & DTIM ----> https://community.arubanetworks.com/blogs/gstefanick1/2016/01/25/80211-tim-and-dtim-information-elements
 			ae.Uint32(unix.NL80211_ATTR_DTIM_PERIOD, uint32(2)) // A DTIM period field of 2 indicates every 2nd beacon is a DTIM.
 
-			ae.Uint32(unix.NL80211_ATTR_AUTH_TYPE, unix.NL80211_AUTHTYPE_OPEN_SYSTEM)
+			// ae.Uint32(unix.NL80211_ATTR_AUTH_TYPE, unix.NL80211_AUTHTYPE_OPEN_SYSTEM)
 
-			ae.Flag(unix.NL80211_ATTR_PRIVACY, true)
+			// ae.Flag(unix.NL80211_ATTR_PRIVACY, true)
 
 			// TODO: figure out what these values mean
 			ae.Bytes(unix.NL80211_ATTR_IE, []byte{0x7F, 0x08, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
