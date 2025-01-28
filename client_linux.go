@@ -105,6 +105,27 @@ func initClient(c *genetlink.Conn) (*client, error) {
 				return nil, err
 			}
 			log.Printf("joined multicast group - %s\n", group.Name)
+		} else if group.Name == unix.NL80211_MULTICAST_GROUP_CONFIG {
+			err = conn.JoinGroup(group.ID)
+			if err != nil {
+				log.Printf("join group  failed - %s\n", err)
+				return nil, err
+			}
+			log.Printf("joined multicast group - %s\n", group.Name)
+		} else if group.Name == unix.NL80211_MULTICAST_GROUP_NAN {
+			err = conn.JoinGroup(group.ID)
+			if err != nil {
+				log.Printf("join group  failed - %s\n", err)
+				return nil, err
+			}
+			log.Printf("joined multicast group - %s\n", group.Name)
+		} else if group.Name == unix.NL80211_MULTICAST_GROUP_TESTMODE {
+			err = conn.JoinGroup(group.ID)
+			if err != nil {
+				log.Printf("join group  failed - %s\n", err)
+				return nil, err
+			}
+			log.Printf("joined multicast group - %s\n", group.Name)
 		}
 	}
 
