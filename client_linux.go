@@ -918,6 +918,24 @@ func (c *client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
 			ae.Bytes(unix.NL80211_ATTR_IE, []byte{0x7F, 0x08, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
 			ae.Bytes(unix.NL80211_ATTR_IE_PROBE_RESP, []byte{0x7F, 0x08, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
 			ae.Bytes(unix.NL80211_ATTR_IE_ASSOC_RESP, []byte{0x7F, 0x08, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
+
+			support, err := c.CheckExtFeature(ifi, unix.NL80211_EXT_FEATURE_CONTROL_PORT_OVER_NL80211)
+			if err != nil {
+				log.Printf("checkExtFeature NL80211_EXT_FEATURE_CONTROL_PORT_OVER_NL80211 error - %s\n", err)
+			}
+			if !support {
+				log.Printf("checkExtFeature NL80211_EXT_FEATURE_CONTROL_PORT_OVER_NL80211 NOT supported\n")
+			} else {
+				log.Printf("checkExtFeature NL80211_EXT_FEATURE_CONTROL_PORT_OVER_NL80211 supported\n")
+				/*
+				   l_genl_msg_append_attr(cmd, NL80211_ATTR_SOCKET_OWNER, 0, NULL);
+				   		l_genl_msg_append_attr(cmd,
+				   				NL80211_ATTR_CONTROL_PORT_OVER_NL80211,
+				   				0, NULL);
+				*/
+				ae.Flag(unix.NL80211_ATTR_SOCKET_OWNER, true)
+				ae.Flag(unix.NL80211_ATTR_CONTROL_PORT_OVER_NL80211, true)
+			}
 		},
 	)
 
