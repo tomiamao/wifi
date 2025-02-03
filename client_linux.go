@@ -188,7 +188,7 @@ func (c *client) Disconnect(ifi *Interface) error {
 // ConnectWPAPSK starts connecting the interface to the specified SSID using
 // WPA.
 func (c *client) ConnectWPAPSK(ifi *Interface, ssid, psk string) error {
-	support, err := c.checkExtFeature(ifi, unix.NL80211_EXT_FEATURE_4WAY_HANDSHAKE_STA_PSK)
+	support, err := c.CheckExtFeature(ifi, unix.NL80211_EXT_FEATURE_4WAY_HANDSHAKE_STA_PSK)
 	if err != nil {
 		log.Printf("checkExtFeature NL80211_EXT_FEATURE_4WAY_HANDSHAKE_STA_PSK not supported\n")
 		return err
@@ -199,7 +199,7 @@ func (c *client) ConnectWPAPSK(ifi *Interface, ssid, psk string) error {
 		return fmt.Errorf("errNotSupported")
 	}
 
-	support, err = c.checkExtFeature(ifi, unix.NL80211_EXT_FEATURE_4WAY_HANDSHAKE_STA_1X)
+	support, err = c.CheckExtFeature(ifi, unix.NL80211_EXT_FEATURE_4WAY_HANDSHAKE_STA_1X)
 	if err != nil {
 		log.Printf("checkExtFeature NL80211_EXT_FEATURE_4WAY_HANDSHAKE_STA_1X not supported\n")
 		return err
@@ -1107,7 +1107,7 @@ func (c *client) TriggerScan(ifi *Interface) error {
 }
 
 // checkExtFeature Checks if a physical interface supports a extended feature
-func (c *client) checkExtFeature(ifi *Interface, feature uint) (bool, error) {
+func (c *client) CheckExtFeature(ifi *Interface, feature uint) (bool, error) {
 	msgs, err := c.get(
 		unix.NL80211_CMD_GET_WIPHY,
 		netlink.Dump,

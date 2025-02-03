@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 package wifi
 
 import (
@@ -80,6 +83,10 @@ func (c *Client) SetWriteDeadline(t time.Time) error {
 
 //*******************************
 // ADDITIONS START
+
+func (c *Client) CheckExtFeature(ifi *Interface, feature uint) (bool, error) {
+	return c.c.CheckExtFeature(ifi, feature)
+}
 
 func (c *Client) StartMulticastProcessing() {
 	c.c.StartMulticastProcessing()
