@@ -934,6 +934,41 @@ Ours
             Capability: bit 62: Opmode Notification
             04 00 00 02 00 00 00 40
 
+
+
+< Request: Start AP (0x0f) len 180 [ack]                                                                                                                                                                   403.221368
+    Interface Index: 13 (0x0000000d)
+    Beacon Head: len 57
+        80 00 00 00 ff ff ff ff ff ff 04 f0 21 b5 9b 48  ............!..H
+        04 f0 21 b5 9b 48 00 00 00 00 00 00 00 00 00 00  ..!..H..........
+        64 00 01 04 01 07 12 14 16 0c 12 18 24 00 07 42  d...........$..B
+        6f 78 57 69 46 69 03 01 06                       oxWiFi...
+    Beacon Tail: len 9
+        2a 01 04 32 04 30 48 60 6c                       *..2.0H`l
+    SSID: len 7
+        42 6f 78 57 69 46 69                             BoxWiFi
+    Hidden SSID: 0 (0x00000000)
+    Beacon Interval: 100 (0x00000064)
+    DTIM Period: 2 (0x00000002)
+    Auth Type: 0 (0x00000000)
+    Information Elements: len 10
+        Extended Capabilities: len 8
+            Capability: bit  2: Extended channel switching
+            Capability: bit 25: SSID list
+            Capability: bit 62: Opmode Notification
+            04 00 00 02 00 00 00 40                          .......@
+    IE Probe Response: len 10
+        Extended Capabilities: len 8
+            Capability: bit  2: Extended channel switching
+            Capability: bit 25: SSID list
+            Capability: bit 62: Opmode Notification
+            04 00 00 02 00 00 00 40                          .......@
+    IE Assoc Response: len 10
+        Extended Capabilities: len 8
+            Capability: bit  2: Extended channel switching
+            Capability: bit 25: SSID list
+            Capability: bit 62: Opmode Notification
+            04 00 00 02 00 00 00 40                          .......@
 */
 
 // use channel 6 in the 2.4GHz spectrum - specify 6 for freqChannel
@@ -974,6 +1009,7 @@ func (c *client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
 			(&beaconTail).AppendExtendedSupportedRateIE(false, 36) // optional 36Mbps
 			(&beaconTail).AppendExtendedSupportedRateIE(false, 48) // optional 48Mbps
 			(&beaconTail).AppendExtendedSupportedRateIE(false, 54) // optional 54Mbps
+			(&beaconTail).SetExtendedCapabilties()
 			ae.Bytes(unix.NL80211_ATTR_BEACON_TAIL, beaconTail.Serialize())
 
 			ae.Bytes(unix.NL80211_ATTR_SSID, []byte(ssid))
