@@ -776,11 +776,18 @@ func (b BeaconHead) Serialize() []byte {
 type BeaconTail struct {
 	ERP                    []byte
 	ExtendedSupportedRates []byte
+	ExtendedCapabilties    []byte
 }
 
 func (b *BeaconTail) SetERPIE() error {
 	b.ERP = make([]byte, 0)
 	b.ERP = append(b.ERP, 0x2A, 0x1, 0x4) // element ID, length, set Barker Preamble mode
+	return nil
+}
+
+func (b *BeaconTail) SetExtendedCapabilties() error {
+	b.ExtendedCapabilties = make([]byte, 0)
+	b.ExtendedCapabilties = append(b.ERP, 0x7F, 0x8, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40) // element ID, length, Extended capabilites
 	return nil
 }
 
@@ -796,11 +803,11 @@ func (b *BeaconTail) AppendExtendedSupportedRateIE(mandatory bool, rateMbps uint
 	}
 	val := mandatoryBit | byte(rateMbps*2)
 
-	if len(b.ExtendedSupportedRates) > 1 && len(b.ExtendedSupportedRates) < 3 {
+	if len(b.ExtendedSupportedRates) == 2 {
 		return fmt.Errorf("invalid supported rate filed")
 	}
 	if len(b.ExtendedSupportedRates) == 0 { // no previous supported rates configured
-		b.ExtendedSupportedRates = append(b.ExtendedSupportedRates, 0x1, 0x1, val) // element ID, length
+		b.ExtendedSupportedRates = append(b.ExtendedSupportedRates, 0x32, 0x1, val) // element ID, length
 		return nil
 	}
 
@@ -820,6 +827,7 @@ func (b BeaconTail) Serialize() []byte {
 	data := make([]byte, 0)
 	data = append(data, b.ERP...)
 	data = append(data, b.ExtendedSupportedRates...)
+	data = append(data, b.ExtendedCapabilties...)
 
 	return data
 }
@@ -861,6 +869,72 @@ func (c *client) StopAP(ifi *Interface) error {
 
 	return err
 }
+
+/*
+
+Ours
+79.656817
+
+< Request: Start AP (0x0f) len 152 [ack]                                                                                                                                                                    79.656817
+    Interface Index: 8 (0x00000008)
+    Beacon Head: len 57
+        80 00 00 00 ff ff ff ff ff ff 04 f0 21 b5 9b 48  ............!..H
+        04 f0 21 b5 9b 48 00 00 00 00 00 00 00 00 00 00  ..!..H..........
+        64 00 01 04 01 07 12 14 16 0c 12 18 24 00 07 42  d...........$..B
+        6f 78 57 69 46 69 03 01 06                       oxWiFi...
+    Beacon Tail: len 9
+        2a 01 04 01 04 30 48 60 6c                       *....0H`l
+    SSID: len 7
+        42 6f 78 57 69 46 69                             BoxWiFi
+    Hidden SSID: 0 (0x00000000)
+    Beacon Interval: 100 (0x00000064)
+    DTIM Period: 2 (0x00000002)
+    Auth Type: 0 (0x00000000)
+    Information Elements: len 0
+    IE Probe Response: len 0
+    IE Assoc Response: len 0
+    Socket Owns Interface/Connection: true
+    Control Port over NL80211: true
+
+
+
+4776.890864
+
+< Request: Start AP (0x0f) len 184 [ack]                                                                                                                                                                  4776.890864
+    Interface Index: 13 (0x0000000d)
+    Beacon Head: len 58
+        80 00 00 00 ff ff ff ff ff ff 04 f0 21 b5 9b 48  ............!..H
+        04 f0 21 b5 9b 48 00 00 00 00 00 00 00 00 00 00  ..!..H..........
+        64 00 01 04 00 07 42 6f 78 57 69 46 69 01 08 82  d.....BoxWiFi...
+        84 8b 96 0c 12 18 24 03 01 06                    ......$...
+    Beacon Tail: len 23
+        2a 01 04 32 04 30 48 60 6c 3b 02 51 00 7f 08 04  *..2.0H`l;.Q....
+        00 00 02 00 00 00 40                             ......@
+    Beacon Interval: 100 (0x00000064)
+    DTIM Period: 2 (0x00000002)
+    SSID: len 7
+        42 6f 78 57 69 46 69                             BoxWiFi
+    Hidden SSID: 0 (0x00000000)
+    Information Elements: len 10
+        Extended Capabilities: len 8
+            Capability: bit  2: Extended channel switching
+            Capability: bit 25: SSID list
+            Capability: bit 62: Opmode Notification
+            04 00 00 02 00 00 00 40                          .......@
+    IE Probe Response: len 10
+        Extended Capabilities: len 8
+            Capability: bit  2: Extended channel switching
+            Capability: bit 25: SSID list
+            Capability: bit 62: Opmode Notification
+            04 00 00 02 00 00 00 40                          .......@
+    IE Assoc Response: len 10
+        Extended Capabilities: len 8
+            Capability: bit  2: Extended channel switching
+            Capability: bit 25: SSID list
+            Capability: bit 62: Opmode Notification
+            04 00 00 02 00 00 00 40
+
+*/
 
 // use channel 6 in the 2.4GHz spectrum - specify 6 for freqChannel
 func (c *client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
@@ -915,12 +989,9 @@ func (c *client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
 			// ae.Flag(unix.NL80211_ATTR_PRIVACY, false)
 
 			// TODO: figure out what these values mean
-			// ae.Bytes(unix.NL80211_ATTR_IE, []byte{0x7F, 0x08, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
-			// ae.Bytes(unix.NL80211_ATTR_IE_PROBE_RESP, []byte{0x7F, 0x08, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
-			// ae.Bytes(unix.NL80211_ATTR_IE_ASSOC_RESP, []byte{0x7F, 0x08, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
-			ae.Flag(unix.NL80211_ATTR_IE, true)
-			ae.Flag(unix.NL80211_ATTR_IE_PROBE_RESP, true)
-			ae.Flag(unix.NL80211_ATTR_IE_ASSOC_RESP, true)
+			ae.Bytes(unix.NL80211_ATTR_IE, []byte{0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
+			ae.Bytes(unix.NL80211_ATTR_IE_PROBE_RESP, []byte{0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
+			ae.Bytes(unix.NL80211_ATTR_IE_ASSOC_RESP, []byte{0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
 
 			support, err := c.CheckExtFeature(ifi, unix.NL80211_EXT_FEATURE_CONTROL_PORT_OVER_NL80211)
 			if err != nil {
@@ -936,8 +1007,8 @@ func (c *client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
 				   				NL80211_ATTR_CONTROL_PORT_OVER_NL80211,
 				   				0, NULL);
 				*/
-				ae.Flag(unix.NL80211_ATTR_SOCKET_OWNER, true)
-				ae.Flag(unix.NL80211_ATTR_CONTROL_PORT_OVER_NL80211, true)
+				// ae.Flag(unix.NL80211_ATTR_SOCKET_OWNER, true)
+				// ae.Flag(unix.NL80211_ATTR_CONTROL_PORT_OVER_NL80211, true)
 			}
 		},
 	)
@@ -1254,7 +1325,7 @@ func (c *client) SetMulticastToUnicast(ifi *Interface) error {
 		netlink.Acknowledge,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
-			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
+			// ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
 		},
 	)
 	if err != nil {
