@@ -108,6 +108,10 @@ func (c *Client) SetWiPhy(ifi *Interface, freq uint32) error {
 	return c.c.SetWiPhy(ifi, freq)
 }
 
+func (c *Client) SetTXQParams(ifi *Interface, queue uint8, aifs uint8, cw_min, cw_max, burst_time uint16) error {
+	return c.c.SetTXQParams(ifi, queue, aifs, cw_min, cw_max, burst_time)
+}
+
 func (c *Client) AllBSS(ifi *Interface) ([]*BSS, error) {
 	return c.c.AllBSS(ifi)
 }

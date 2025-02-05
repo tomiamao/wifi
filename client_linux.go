@@ -1359,6 +1359,28 @@ func parseAllBSS(msgs []genetlink.Message) ([]*BSS, error) {
 	return all_bss, nil
 }
 
+func (c *client) SetTXQParams(ifi *Interface, queue uint8, aifs uint8, cw_min, cw_max, burst_time uint16) error {
+	_, err := c.get(
+		unix.NL80211_CMD_SET_WIPHY,
+		netlink.Acknowledge,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			ae.Nested(unix.NL80211_ATTR_WIPHY_TXQ_PARAMS, func(nae *netlink.AttributeEncoder) error {
+				nae.Uint8(unix.NL80211_TXQ_ATTR_QUEUE, queue)
+
+				nae.Uint16(unix.NL80211_TXQ_ATTR_TXOP, (burst_time*100+16)/32)
+				nae.Uint16(unix.NL80211_TXQ_ATTR_CWMIN, cw_min)
+				nae.Uint16(unix.NL80211_TXQ_ATTR_CWMAX, cw_max)
+
+				nae.Uint8(unix.NL80211_TXQ_ATTR_AIFS, aifs)
+				return nil
+			})
+		},
+	)
+
+	return err
+}
+
 func (c *client) SetBSS(ifi *Interface) error {
 	_, err := c.get(
 		unix.NL80211_CMD_SET_BSS,
@@ -1369,7 +1391,7 @@ func (c *client) SetBSS(ifi *Interface) error {
 			ae.Uint8(unix.NL80211_ATTR_BSS_SHORT_PREAMBLE, 0x0)
 			ae.Uint8(unix.NL80211_ATTR_BSS_SHORT_SLOT_TIME, 0x1)
 			ae.Uint8(unix.NL80211_ATTR_AP_ISOLATE, 0x0)
-			ae.Uint32(unix.NL80211_ATTR_BSS_BASIC_RATES, 0x160b0402)
+			ae.Uint32(unix.NL80211_ATTR_BSS_BASIC_RATES, 0x160b0402) //  02 04 0b 16
 		},
 	)
 	if err != nil {
