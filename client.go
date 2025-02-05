@@ -116,6 +116,10 @@ func (c *Client) SetBSS(ifi *Interface) error {
 	return c.c.SetBSS(ifi)
 }
 
+func (c *Client) RegisterUnexpectedFrames(ifi *Interface) error {
+	return c.c.RegisterUnexpectedFrames(ifi)
+}
+
 func (c *Client) TriggerScan(ifi *Interface) error {
 	return c.c.TriggerScan(ifi)
 }
