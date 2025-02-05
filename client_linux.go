@@ -1359,6 +1359,45 @@ func parseAllBSS(msgs []genetlink.Message) ([]*BSS, error) {
 	return all_bss, nil
 }
 
+/*
+< Request: Set Wiphy (0x02) len 52 [ack]                                                                                                                                                                    10.002552
+    Interface Index: 6 (0x00000006)
+    Wiphy TXQ Parameters: len 40
+        05 00 01 00 00 00 00 00 06 00 02 00 2f 00 00 00  ............/...
+        06 00 03 00 03 00 00 00 06 00 04 00 07 00 00 00  ................
+        05 00 05 00 01 00 00 00                          ........
+
+< Request: Set Wiphy (0x02) len 56 [ack]                                                                                                                                                                    12.075553
+    Interface Index: 6 (0x00000006)
+    Wiphy TXQ Parameters: len 44
+        2c 00 01 80 05 00 01 00 00 00 00 00 06 00 02 00  ,...............
+        2f 00 00 00 06 00 03 00 03 00 00 00 06 00 04 00  /...............
+        07 00 00 00 05 00 05 00 01 00 00 00              ............
+
+< Request: Set Wiphy (0x02) len 56 [ack]                                                                                                                                                                    12.075815
+    Interface Index: 6 (0x00000006)
+    Wiphy TXQ Parameters: len 44
+        2c 00 01 80 05 00 01 00 01 00 00 00 06 00 02 00  ,...............
+        5e 00 00 00 06 00 03 00 07 00 00 00 06 00 04 00  ^...............
+        0f 00 00 00 05 00 05 00 01 00 00 00              ............
+
+< Request: Set Wiphy (0x02) len 56 [ack]                                                                                                                                                                    12.076043
+    Interface Index: 6 (0x00000006)
+    Wiphy TXQ Parameters: len 44
+        2c 00 01 80 05 00 01 00 02 00 00 00 06 00 02 00  ,...............
+        00 00 00 00 06 00 03 00 0f 00 00 00 06 00 04 00  ................
+        3f 00 00 00 05 00 05 00 03 00 00 00              ?...........
+
+< Request: Set Wiphy (0x02) len 56 [ack]                                                                                                                                                                    12.076247
+    Interface Index: 6 (0x00000006)
+    Wiphy TXQ Parameters: len 44
+        2c 00 01 80 05 00 01 00 03 00 00 00 06 00 02 00  ,...............
+        00 00 00 00 06 00 03 00 0f 00 00 00 06 00 04 00  ................
+        ff 03 00 00 05 00 05 00 07 00 00 00              ............
+
+
+*/
+
 func (c *client) SetTXQParams(ifi *Interface, queue uint8, aifs uint8, cw_min, cw_max, burst_time uint16) error {
 	_, err := c.get(
 		unix.NL80211_CMD_SET_WIPHY,
@@ -1366,13 +1405,18 @@ func (c *client) SetTXQParams(ifi *Interface, queue uint8, aifs uint8, cw_min, c
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			ae.Nested(unix.NL80211_ATTR_WIPHY_TXQ_PARAMS, func(nae *netlink.AttributeEncoder) error {
-				nae.Uint8(unix.NL80211_TXQ_ATTR_QUEUE, queue)
 
-				nae.Uint16(unix.NL80211_TXQ_ATTR_TXOP, (burst_time*100+16)/32)
-				nae.Uint16(unix.NL80211_TXQ_ATTR_CWMIN, cw_min)
-				nae.Uint16(unix.NL80211_TXQ_ATTR_CWMAX, cw_max)
+				/* We are only sending parameters for a single TXQ at a time */
+				nae.Nested(1, func(nnae *netlink.AttributeEncoder) error {
+					nnae.Uint8(unix.NL80211_TXQ_ATTR_QUEUE, queue)
 
-				nae.Uint8(unix.NL80211_TXQ_ATTR_AIFS, aifs)
+					nnae.Uint16(unix.NL80211_TXQ_ATTR_TXOP, (burst_time*100+16)/32)
+					nnae.Uint16(unix.NL80211_TXQ_ATTR_CWMIN, cw_min)
+					nnae.Uint16(unix.NL80211_TXQ_ATTR_CWMAX, cw_max)
+
+					nnae.Uint8(unix.NL80211_TXQ_ATTR_AIFS, aifs)
+					return nil
+				})
 				return nil
 			})
 		},
