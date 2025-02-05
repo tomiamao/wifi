@@ -691,7 +691,7 @@ type BeaconHead struct {
 }
 
 // rate in Mbps
-func (b *BeaconHead) AppendSupportedRateIE(mandatory bool, rateMbps uint) error {
+func (b *BeaconHead) AppendSupportedRateIE(mandatory bool, rateMbps float64) error {
 	if b.SupportedRates == nil {
 		b.SupportedRates = make([]byte, 0)
 	}
@@ -778,6 +778,7 @@ func (b BeaconHead) Serialize() []byte {
 type BeaconTail struct {
 	ERP                    []byte
 	ExtendedSupportedRates []byte
+	MDIE                   []byte //  MDIE (Mobility Domain Information Element)
 	ExtendedCapabilties    []byte
 }
 
@@ -790,6 +791,13 @@ func (b *BeaconTail) SetERPIE() error {
 func (b *BeaconTail) SetExtendedCapabilties() error {
 	b.ExtendedCapabilties = make([]byte, 0)
 	b.ExtendedCapabilties = append(b.ExtendedCapabilties, 0x7F, 0x8, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40) // element ID, length, Extended capabilites
+	return nil
+}
+
+// MDIE (Mobility Domain Information Element)
+func (b *BeaconTail) SetMDIE() error {
+	b.MDIE = make([]byte, 0)
+	b.MDIE = append(b.MDIE, 0x3B, 0x02, 0x51, 0x00) // element ID, length, MDIE
 	return nil
 }
 
@@ -829,6 +837,7 @@ func (b BeaconTail) Serialize() []byte {
 	data := make([]byte, 0)
 	data = append(data, b.ERP...)
 	data = append(data, b.ExtendedSupportedRates...)
+	data = append(data, b.MDIE...)
 	data = append(data, b.ExtendedCapabilties...)
 
 	return data
@@ -938,22 +947,21 @@ Ours
 
 
 
-< Request: Start AP (0x0f) len 188 [ack]                                                                                                                                                                    31.022577
+< Request: Start AP (0x0f) len 180 [ack]                                                                                                                                                                  1127.189347
     Interface Index: 13 (0x0000000d)
     Beacon Head: len 57
         80 00 00 00 ff ff ff ff ff ff 04 f0 21 b5 9b 48  ............!..H
         04 f0 21 b5 9b 48 00 00 00 00 00 00 00 00 00 00  ..!..H..........
-        64 00 01 04 00 07 42 6f 78 57 69 46 69 01 07 12  d.....BoxWiFi...
-        14 16 0c 12 18 24 03 01 06                       .....$...
+        64 00 01 04 00 07 42 6f 78 57 69 46 69 01 07 82  d.....BoxWiFi...
+        84 96 0c 12 18 24 03 01 06                       .....$...
     Beacon Tail: len 19
         2a 01 04 32 04 30 48 60 6c 7f 08 04 00 00 02 00  *..2.0H`l.......
         00 00 40                                         ..@
+    Beacon Interval: 100 (0x00000064)
+    DTIM Period: 2 (0x00000002)
     SSID: len 7
         42 6f 78 57 69 46 69                             BoxWiFi
     Hidden SSID: 0 (0x00000000)
-    Beacon Interval: 100 (0x00000064)
-    DTIM Period: 2 (0x00000002)
-    Auth Type: 0 (0x00000000)
     Information Elements: len 10
         Extended Capabilities: len 8
             Capability: bit  2: Extended channel switching
@@ -1003,6 +1011,7 @@ func (c *client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
 			(&beaconHead).SetSSIDIE(ssid)
 			(&beaconHead).AppendSupportedRateIE(true, 1)   // madatory 1Mbps
 			(&beaconHead).AppendSupportedRateIE(true, 2)   // madatory 2Mbps
+			(&beaconHead).AppendSupportedRateIE(true, 5.5) // madatory 5.5Mbps
 			(&beaconHead).AppendSupportedRateIE(true, 11)  // madatory 11Mbps
 			(&beaconHead).AppendSupportedRateIE(false, 6)  // optional 6Mbps
 			(&beaconHead).AppendSupportedRateIE(false, 9)  // optional 9Mbps
@@ -1017,6 +1026,7 @@ func (c *client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
 			(&beaconTail).AppendExtendedSupportedRateIE(false, 36) // optional 36Mbps
 			(&beaconTail).AppendExtendedSupportedRateIE(false, 48) // optional 48Mbps
 			(&beaconTail).AppendExtendedSupportedRateIE(false, 54) // optional 54Mbps
+			(&beaconTail).SetMDIE()
 			(&beaconTail).SetExtendedCapabilties()
 			ae.Bytes(unix.NL80211_ATTR_BEACON_TAIL, beaconTail.Serialize())
 
