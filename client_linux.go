@@ -734,7 +734,7 @@ func (b *BeaconHead) SetSSIDIE(ssid string) error {
 // used by the 2.4GHz channel. Possbile Channel values range from 1-14, with 7 being the default
 func (b *BeaconHead) SetDSParamIE(channel byte) error {
 	b.DSParamSet = make([]byte, 0)
-	b.DSParamSet = append(b.SSID, 0x3, 0x1, channel) // element ID, length, channel
+	b.DSParamSet = append(b.DSParamSet, 0x3, 0x1, channel) // element ID, length, channel
 	return nil
 }
 
@@ -767,6 +767,8 @@ func (b BeaconHead) Serialize() []byte {
 	b.ByteOrder.PutUint16(capabilityInfo, b.CapabilityInfo)
 	data = append(data, capabilityInfo...)
 
+	data = append(data, b.SSID...)
+
 	data = append(data, b.SupportedRates...)
 	data = append(data, b.DSParamSet...)
 
@@ -787,7 +789,7 @@ func (b *BeaconTail) SetERPIE() error {
 
 func (b *BeaconTail) SetExtendedCapabilties() error {
 	b.ExtendedCapabilties = make([]byte, 0)
-	b.ExtendedCapabilties = append(b.ERP, 0x7F, 0x8, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40) // element ID, length, Extended capabilites
+	b.ExtendedCapabilties = append(b.ExtendedCapabilties, 0x7F, 0x8, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40) // element ID, length, Extended capabilites
 	return nil
 }
 
@@ -936,15 +938,16 @@ Ours
 
 
 
-< Request: Start AP (0x0f) len 180 [ack]                                                                                                                                                                   403.221368
+< Request: Start AP (0x0f) len 192 [ack]                                                                                                                                                                   799.062758
     Interface Index: 13 (0x0000000d)
     Beacon Head: len 57
         80 00 00 00 ff ff ff ff ff ff 04 f0 21 b5 9b 48  ............!..H
         04 f0 21 b5 9b 48 00 00 00 00 00 00 00 00 00 00  ..!..H..........
         64 00 01 04 01 07 12 14 16 0c 12 18 24 00 07 42  d...........$..B
         6f 78 57 69 46 69 03 01 06                       oxWiFi...
-    Beacon Tail: len 9
-        2a 01 04 32 04 30 48 60 6c                       *..2.0H`l
+    Beacon Tail: len 22
+        2a 01 04 32 04 30 48 60 6c 2a 01 04 7f 08 04 00  *..2.0H`l*......
+        00 02 00 00 00 40                                .....@
     SSID: len 7
         42 6f 78 57 69 46 69                             BoxWiFi
     Hidden SSID: 0 (0x00000000)
@@ -970,6 +973,11 @@ Ours
             Capability: bit 62: Opmode Notification
             04 00 00 02 00 00 00 40                          .......@
 */
+
+/*
+*	Information Elements
+*	https://www.nsnam.org/docs/release/3.15/doxygen/wifi-information-element_8h_source.html
+ */
 
 // use channel 6 in the 2.4GHz spectrum - specify 6 for freqChannel
 func (c *client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
