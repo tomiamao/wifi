@@ -1060,8 +1060,8 @@ func (c *client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
 				   				NL80211_ATTR_CONTROL_PORT_OVER_NL80211,
 				   				0, NULL);
 				*/
-				// ae.Flag(unix.NL80211_ATTR_SOCKET_OWNER, true)
-				// ae.Flag(unix.NL80211_ATTR_CONTROL_PORT_OVER_NL80211, true)
+				ae.Flag(unix.NL80211_ATTR_SOCKET_OWNER, true)
+				ae.Flag(unix.NL80211_ATTR_CONTROL_PORT_OVER_NL80211, true)
 			}
 		},
 	)
