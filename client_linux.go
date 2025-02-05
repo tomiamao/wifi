@@ -698,11 +698,11 @@ func (b *BeaconHead) AppendSupportedRateIE(mandatory bool, rateMbps uint) error 
 
 	var mandatoryBit byte = 0
 	if mandatory {
-		mandatoryBit = 0x10
+		mandatoryBit = 0x80
 	}
 	val := mandatoryBit | byte(rateMbps*2)
 
-	if len(b.SupportedRates) > 1 && len(b.SupportedRates) < 3 {
+	if len(b.SupportedRates) == 2 {
 		return fmt.Errorf("invalid supported rate filed")
 	}
 	if len(b.SupportedRates) == 0 { // no previous supported rates configured
@@ -801,7 +801,7 @@ func (b *BeaconTail) AppendExtendedSupportedRateIE(mandatory bool, rateMbps uint
 
 	var mandatoryBit byte = 0
 	if mandatory {
-		mandatoryBit = 0x10
+		mandatoryBit = 0x80
 	}
 	val := mandatoryBit | byte(rateMbps*2)
 
@@ -938,16 +938,16 @@ Ours
 
 
 
-< Request: Start AP (0x0f) len 192 [ack]                                                                                                                                                                   799.062758
+< Request: Start AP (0x0f) len 188 [ack]                                                                                                                                                                    31.022577
     Interface Index: 13 (0x0000000d)
     Beacon Head: len 57
         80 00 00 00 ff ff ff ff ff ff 04 f0 21 b5 9b 48  ............!..H
         04 f0 21 b5 9b 48 00 00 00 00 00 00 00 00 00 00  ..!..H..........
-        64 00 01 04 01 07 12 14 16 0c 12 18 24 00 07 42  d...........$..B
-        6f 78 57 69 46 69 03 01 06                       oxWiFi...
-    Beacon Tail: len 22
-        2a 01 04 32 04 30 48 60 6c 2a 01 04 7f 08 04 00  *..2.0H`l*......
-        00 02 00 00 00 40                                .....@
+        64 00 01 04 00 07 42 6f 78 57 69 46 69 01 07 12  d.....BoxWiFi...
+        14 16 0c 12 18 24 03 01 06                       .....$...
+    Beacon Tail: len 19
+        2a 01 04 32 04 30 48 60 6c 7f 08 04 00 00 02 00  *..2.0H`l.......
+        00 00 40                                         ..@
     SSID: len 7
         42 6f 78 57 69 46 69                             BoxWiFi
     Hidden SSID: 0 (0x00000000)
@@ -1020,15 +1020,14 @@ func (c *client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
 			(&beaconTail).SetExtendedCapabilties()
 			ae.Bytes(unix.NL80211_ATTR_BEACON_TAIL, beaconTail.Serialize())
 
-			ae.Bytes(unix.NL80211_ATTR_SSID, []byte(ssid))
-			ae.Uint32(unix.NL80211_ATTR_HIDDEN_SSID, uint32(unix.NL80211_HIDDEN_SSID_NOT_IN_USE))
-
 			ae.Uint32(unix.NL80211_ATTR_BEACON_INTERVAL, uint32(100)) // 100 TU  ==> 102.4ms
-
 			// About TIM & DTIM ----> https://community.arubanetworks.com/blogs/gstefanick1/2016/01/25/80211-tim-and-dtim-information-elements
 			ae.Uint32(unix.NL80211_ATTR_DTIM_PERIOD, uint32(2)) // A DTIM period field of 2 indicates every 2nd beacon is a DTIM.
 
-			ae.Uint32(unix.NL80211_ATTR_AUTH_TYPE, unix.NL80211_AUTHTYPE_OPEN_SYSTEM)
+			ae.Bytes(unix.NL80211_ATTR_SSID, []byte(ssid))
+			ae.Uint32(unix.NL80211_ATTR_HIDDEN_SSID, uint32(unix.NL80211_HIDDEN_SSID_NOT_IN_USE))
+
+			// ae.Uint32(unix.NL80211_ATTR_AUTH_TYPE, unix.NL80211_AUTHTYPE_OPEN_SYSTEM)
 
 			// ae.Flag(unix.NL80211_ATTR_PRIVACY, false)
 
