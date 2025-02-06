@@ -172,7 +172,8 @@ func (c *client) Connect(ifi *Interface, ssid string) error {
 	// Ask nl80211 to connect to the specified SSID.
 	_, err := c.get(
 		unix.NL80211_CMD_CONNECT,
-		netlink.Acknowledge,
+		// netlink.Acknowledge
+		netlink.Request,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			ae.Bytes(unix.NL80211_ATTR_SSID, []byte(ssid))
@@ -187,7 +188,8 @@ func (c *client) Disconnect(ifi *Interface) error {
 	// Ask nl80211 to disconnect.
 	_, err := c.get(
 		unix.NL80211_CMD_DISCONNECT,
-		netlink.Acknowledge,
+		// netlink.Acknowledge
+		netlink.Request,
 		ifi,
 		nil,
 	)
@@ -221,7 +223,8 @@ func (c *client) ConnectWPAPSK(ifi *Interface, ssid, psk string) error {
 	// Ask nl80211 to connect to the specified SSID with key..
 	_, err = c.get(
 		unix.NL80211_CMD_CONNECT,
-		netlink.Acknowledge,
+		// netlink.Acknowledge
+		netlink.Request,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			// TODO(mdlayher): document these or build from bitflags.
@@ -329,7 +332,8 @@ func (c *client) get(
 		params(ae)
 	}
 
-	// Note: don't send netlink.Acknowledge or we get an extra message back from
+	// Note: don't send netlink.Acknowledge
+	// or we get an extra message back from
 	// the kernel which doesn't seem useful as of now.
 	return c.execute(cmd, flags, ae)
 }
@@ -367,7 +371,8 @@ func (c *client) execute(
 func (c *client) Authenticate(ifi *Interface, apMacAddr net.HardwareAddr, ssid string, freq uint32) error {
 	_, err := c.get(
 		unix.NL80211_CMD_AUTHENTICATE,
-		netlink.Acknowledge,
+		// netlink.Acknowledge
+		netlink.Request,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
@@ -392,7 +397,8 @@ func (c *client) Associate(ifi *Interface, apMacAddr net.HardwareAddr, ssid stri
 
 	_, err := c.get(
 		unix.NL80211_CMD_ASSOCIATE,
-		netlink.Acknowledge,
+		// netlink.Acknowledge
+		netlink.Request,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
@@ -855,7 +861,8 @@ func (b BeaconTail) Serialize() []byte {
 func (c *client) DeleteStation(ifi *Interface) error {
 	_, err := c.get(
 		unix.NL80211_CMD_DEL_STATION,
-		netlink.Acknowledge,
+		// netlink.Acknowledge
+		netlink.Request,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 		},
@@ -867,7 +874,8 @@ func (c *client) DeleteStation(ifi *Interface) error {
 func (c *client) DeleteKey(ifi *Interface, keyIdx uint8) error {
 	_, err := c.get(
 		unix.NL80211_CMD_DEL_KEY,
-		netlink.Acknowledge,
+		// netlink.Acknowledge
+		netlink.Request,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			ae.Uint8(unix.NL80211_ATTR_KEY_IDX, keyIdx)
@@ -880,7 +888,8 @@ func (c *client) DeleteKey(ifi *Interface, keyIdx uint8) error {
 func (c *client) StopAP(ifi *Interface) error {
 	_, err := c.get(
 		unix.NL80211_CMD_STOP_AP,
-		netlink.Acknowledge,
+		// netlink.Acknowledge
+		netlink.Request,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			// ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
@@ -1000,7 +1009,8 @@ Ours
 func (c *client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
 	_, err := c.get(
 		unix.NL80211_CMD_START_AP,
-		netlink.Acknowledge,
+		// netlink.Acknowledge
+		netlink.Request,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			// ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
@@ -1082,7 +1092,8 @@ func (c *client) SetBeacon(ifi *Interface, ssid string, freqChannel byte) error 
 
 	_, err := c.get(
 		unix.NL80211_CMD_SET_BEACON,
-		netlink.Acknowledge,
+		// netlink.Acknowledge
+		netlink.Request,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			// ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
@@ -1163,7 +1174,8 @@ func (c *client) SetBeacon(ifi *Interface, ssid string, freqChannel byte) error 
 func (c *client) RegisterUnexpectedFrames(ifi *Interface) error {
 	_, err := c.get(
 		unix.NL80211_CMD_UNEXPECTED_FRAME,
-		netlink.Acknowledge,
+		// netlink.Acknowledge
+		netlink.Request,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 		},
@@ -1197,7 +1209,8 @@ func (c *client) GetInterface(ifi *Interface) ([]*Interface, error) {
 func (c *client) SetInterfaceMode(ifi *Interface, mode uint32) error {
 	_, err := c.get(
 		unix.NL80211_CMD_SET_INTERFACE,
-		netlink.Acknowledge,
+		// netlink.Acknowledge
+		netlink.Request,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			ae.Uint32(unix.NL80211_ATTR_IFTYPE, mode)
@@ -1209,46 +1222,48 @@ func (c *client) SetInterfaceMode(ifi *Interface, mode uint32) error {
 // https://github.com/mdlayher/wifi/pull/79/commits/34d4e06d4c027d0a5a2aa851148fd1f28db1bbb0
 func (c *client) TriggerScan(ifi *Interface) error {
 	/*
-		// TRIGGER_SCAN
-				msgs, err := c.get(
-					unix.NL80211_CMD_TRIGGER_SCAN,
-					netlink.Acknowledge,
-					ifi,
-					func(ae *netlink.AttributeEncoder) {
-						ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
-						ae.Nested(unix.NL80211_ATTR_SCAN_SSIDS, func(nae *netlink.AttributeEncoder) error {
-							nae.Bytes(unix.NL80211_ATTR_SCHED_SCAN_MATCH_SSID, nlenc.Bytes(""))
-							return nil
-						})
-					},
-				)
-				if err != nil {
-					log.Printf("netlink NL80211_CMD_TRIGGER_SCAN failed - %s\n", err)
-					return
-				}
+				// TRIGGER_SCAN
+						msgs, err := c.get(
+							unix.NL80211_CMD_TRIGGER_SCAN,
+							// netlink.Acknowledge
+		netlink.Request,
+							ifi,
+							func(ae *netlink.AttributeEncoder) {
+								ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
+								ae.Nested(unix.NL80211_ATTR_SCAN_SSIDS, func(nae *netlink.AttributeEncoder) error {
+									nae.Bytes(unix.NL80211_ATTR_SCHED_SCAN_MATCH_SSID, nlenc.Bytes(""))
+									return nil
+								})
+							},
+						)
+						if err != nil {
+							log.Printf("netlink NL80211_CMD_TRIGGER_SCAN failed - %s\n", err)
+							return
+						}
 
-				log.Printf("netlink NL80211_CMD_TRIGGER_SCAN num messages returned - %d\n", len(msgs))
+						log.Printf("netlink NL80211_CMD_TRIGGER_SCAN num messages returned - %d\n", len(msgs))
 
-				for _, m := range msgs {
-					if m.Header.Version != c.familyVersion {
-						log.Printf("************* SCAN INVALID FAMILY")
-						continue
-					}
-					if m.Header.Command == unix.NL80211_CMD_SCAN_ABORTED {
-						log.Printf("************* SCAN ABORTED")
-						return
-					}
-					if m.Header.Command == unix.NL80211_CMD_NEW_SCAN_RESULTS {
-						log.Printf("*************NEW SCAN RESULTS")
-						break
-					}
+						for _, m := range msgs {
+							if m.Header.Version != c.familyVersion {
+								log.Printf("************* SCAN INVALID FAMILY")
+								continue
+							}
+							if m.Header.Command == unix.NL80211_CMD_SCAN_ABORTED {
+								log.Printf("************* SCAN ABORTED")
+								return
+							}
+							if m.Header.Command == unix.NL80211_CMD_NEW_SCAN_RESULTS {
+								log.Printf("*************NEW SCAN RESULTS")
+								break
+							}
 
-					log.Printf("*************NOTHING NOTHING")
-				}
+							log.Printf("*************NOTHING NOTHING")
+						}
 	*/
 	_, err := c.get(
 		unix.NL80211_CMD_TRIGGER_SCAN,
-		netlink.Acknowledge,
+		// netlink.Acknowledge
+		netlink.Request,
 		ifi,
 		nil,
 	)
@@ -1306,7 +1321,8 @@ found:
 func (c *client) RegisterFrame(ifi *Interface, frameType uint16, frameMatch []byte) error {
 	_, err := c.get(
 		unix.NL80211_CMD_REGISTER_FRAME,
-		netlink.Acknowledge,
+		// netlink.Acknowledge
+		netlink.Request,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			ae.Uint16(unix.NL80211_ATTR_FRAME_TYPE, frameType)
@@ -1410,7 +1426,8 @@ func parseAllBSS(msgs []genetlink.Message) ([]*BSS, error) {
 func (c *client) SetTXQParams(ifi *Interface, queue uint8, aifs uint8, cw_min, cw_max, burst_time uint16) error {
 	_, err := c.get(
 		unix.NL80211_CMD_SET_WIPHY,
-		netlink.Acknowledge,
+		// netlink.Acknowledge
+		netlink.Request,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			ae.Nested(unix.NL80211_ATTR_WIPHY_TXQ_PARAMS, func(nae *netlink.AttributeEncoder) error {
@@ -1437,7 +1454,8 @@ func (c *client) SetTXQParams(ifi *Interface, queue uint8, aifs uint8, cw_min, c
 func (c *client) SetBSS(ifi *Interface) error {
 	_, err := c.get(
 		unix.NL80211_CMD_SET_BSS,
-		netlink.Acknowledge,
+		// netlink.Acknowledge
+		netlink.Request,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			ae.Uint8(unix.NL80211_ATTR_BSS_CTS_PROT, 0x0)
@@ -1457,7 +1475,8 @@ func (c *client) SetBSS(ifi *Interface) error {
 func (c *client) SetMulticastToUnicast(ifi *Interface) error {
 	_, err := c.get(
 		unix.NL80211_CMD_SET_MULTICAST_TO_UNICAST,
-		netlink.Acknowledge,
+		// netlink.Acknowledge
+		netlink.Request,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			// ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
@@ -1473,7 +1492,8 @@ func (c *client) SetMulticastToUnicast(ifi *Interface) error {
 func (c *client) RegisterBeacons(ifi *Interface) error {
 	_, err := c.get(
 		unix.NL80211_CMD_REGISTER_BEACONS,
-		netlink.Acknowledge,
+		// netlink.Acknowledge
+		netlink.Request,
 		nil,
 		// ifi,
 		func(ae *netlink.AttributeEncoder) {
@@ -1490,7 +1510,8 @@ func (c *client) RegisterBeacons(ifi *Interface) error {
 func (c *client) SetWiPhy(ifi *Interface, freq uint32) error {
 	_, err := c.get(
 		unix.NL80211_CMD_SET_WIPHY,
-		netlink.Acknowledge,
+		// netlink.Acknowledge
+		netlink.Request,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			// ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
