@@ -52,6 +52,7 @@ func newClient() (*client, error) {
 	for _, o := range []netlink.ConnOption{
 		netlink.ExtendedAcknowledge,
 		netlink.GetStrictCheck,
+		netlink.NoENOBUFS,
 	} {
 		_ = c.SetOption(o, true)
 	}
@@ -73,6 +74,14 @@ func initClient(c *genetlink.Conn) (*client, error) {
 	if err != nil {
 		log.Printf("netlink dial failed - %s\n", err)
 		return nil, err
+	}
+
+	for _, o := range []netlink.ConnOption{
+		netlink.ExtendedAcknowledge,
+		netlink.GetStrictCheck,
+		netlink.NoENOBUFS,
+	} {
+		_ = conn.SetOption(o, true)
 	}
 
 	for _, group := range family.Groups {
