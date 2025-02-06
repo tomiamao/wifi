@@ -1082,7 +1082,7 @@ func (c *client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
 func (c *client) SetBeacon(ifi *Interface, ssid string, freqChannel byte) error {
 	_, err := c.get(
 		unix.NL80211_CMD_SET_BEACON,
-		0,
+		netlink.Acknowledge,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			// ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
