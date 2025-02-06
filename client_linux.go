@@ -84,62 +84,61 @@ func initClient(c *genetlink.Conn) (*client, error) {
 		} {
 			_ = conn.SetOption(o, true)
 		}
-	*/
 
-	for _, group := range family.Groups {
-		log.Printf("FOUND multicast group - %s\n", group.Name)
-		if group.Name == unix.NL80211_MULTICAST_GROUP_SCAN {
-			// err = conn.JoinGroup(group.ID)
-			err = c.JoinGroup(group.ID)
-			if err != nil {
-				log.Printf("join group  failed - %s\n", err)
-				return nil, err
+		for _, group := range family.Groups {
+			log.Printf("FOUND multicast group - %s\n", group.Name)
+			if group.Name == unix.NL80211_MULTICAST_GROUP_SCAN {
+				err = conn.JoinGroup(group.ID)
+				if err != nil {
+					log.Printf("join group  failed - %s\n", err)
+					return nil, err
+				}
+				log.Printf("joined multicast group - %s\n", group.Name)
+			} else if group.Name == unix.NL80211_MULTICAST_GROUP_MLME {
+				err = conn.JoinGroup(group.ID)
+				if err != nil {
+					log.Printf("join group  failed - %s\n", err)
+					return nil, err
+				}
+				log.Printf("joined multicast group - %s\n", group.Name)
+			} else if group.Name == unix.NL80211_MULTICAST_GROUP_REG {
+				err = conn.JoinGroup(group.ID)
+				if err != nil {
+					log.Printf("join group  failed - %s\n", err)
+					return nil, err
+				}
+				log.Printf("joined multicast group - %s\n", group.Name)
+			} else if group.Name == unix.NL80211_MULTICAST_GROUP_VENDOR {
+				err = conn.JoinGroup(group.ID)
+				if err != nil {
+					log.Printf("join group  failed - %s\n", err)
+					return nil, err
+				}
+				log.Printf("joined multicast group - %s\n", group.Name)
+			} else if group.Name == unix.NL80211_MULTICAST_GROUP_CONFIG {
+				err = conn.JoinGroup(group.ID)
+				if err != nil {
+					log.Printf("join group  failed - %s\n", err)
+					return nil, err
+				}
+				log.Printf("joined multicast group - %s\n", group.Name)
+			} else if group.Name == unix.NL80211_MULTICAST_GROUP_NAN {
+				err = conn.JoinGroup(group.ID)
+				if err != nil {
+					log.Printf("join group  failed - %s\n", err)
+					return nil, err
+				}
+				log.Printf("joined multicast group - %s\n", group.Name)
+			} else if group.Name == unix.NL80211_MULTICAST_GROUP_TESTMODE {
+				err = conn.JoinGroup(group.ID)
+				if err != nil {
+					log.Printf("join group  failed - %s\n", err)
+					return nil, err
+				}
+				log.Printf("joined multicast group - %s\n", group.Name)
 			}
-			log.Printf("joined multicast group - %s\n", group.Name)
-		} else if group.Name == unix.NL80211_MULTICAST_GROUP_MLME {
-			err = c.JoinGroup(group.ID)
-			if err != nil {
-				log.Printf("join group  failed - %s\n", err)
-				return nil, err
-			}
-			log.Printf("joined multicast group - %s\n", group.Name)
-		} else if group.Name == unix.NL80211_MULTICAST_GROUP_REG {
-			err = c.JoinGroup(group.ID)
-			if err != nil {
-				log.Printf("join group  failed - %s\n", err)
-				return nil, err
-			}
-			log.Printf("joined multicast group - %s\n", group.Name)
-		} else if group.Name == unix.NL80211_MULTICAST_GROUP_VENDOR {
-			err = c.JoinGroup(group.ID)
-			if err != nil {
-				log.Printf("join group  failed - %s\n", err)
-				return nil, err
-			}
-			log.Printf("joined multicast group - %s\n", group.Name)
-		} else if group.Name == unix.NL80211_MULTICAST_GROUP_CONFIG {
-			err = c.JoinGroup(group.ID)
-			if err != nil {
-				log.Printf("join group  failed - %s\n", err)
-				return nil, err
-			}
-			log.Printf("joined multicast group - %s\n", group.Name)
-		} else if group.Name == unix.NL80211_MULTICAST_GROUP_NAN {
-			err = c.JoinGroup(group.ID)
-			if err != nil {
-				log.Printf("join group  failed - %s\n", err)
-				return nil, err
-			}
-			log.Printf("joined multicast group - %s\n", group.Name)
-		} else if group.Name == unix.NL80211_MULTICAST_GROUP_TESTMODE {
-			err = c.JoinGroup(group.ID)
-			if err != nil {
-				log.Printf("join group  failed - %s\n", err)
-				return nil, err
-			}
-			log.Printf("joined multicast group - %s\n", group.Name)
 		}
-	}
+	*/
 
 	return &client{
 		c: c,
