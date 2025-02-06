@@ -1360,12 +1360,12 @@ func parseAllBSS(msgs []genetlink.Message) ([]*BSS, error) {
 }
 
 /*
-< Request: Set Wiphy (0x02) len 52 [ack]                                                                                                                                                                    10.002552
+< Request: Set Wiphy (0x02) len 56 [ack]                                                                                                                                                                   897.494534
     Interface Index: 6 (0x00000006)
-    Wiphy TXQ Parameters: len 40
-        05 00 01 00 00 00 00 00 06 00 02 00 2f 00 00 00  ............/...
-        06 00 03 00 03 00 00 00 06 00 04 00 07 00 00 00  ................
-        05 00 05 00 01 00 00 00                          ........
+    Wiphy TXQ Parameters: len 44
+        2c 00 01 80 05 00 01 00 00 00 00 00 06 00 02 00  ,...............
+        2f 00 00 00 06 00 03 00 03 00 00 00 06 00 04 00  /...............
+        07 00 00 00 05 00 05 00 01 00 00 00              ............
 
 < Request: Set Wiphy (0x02) len 56 [ack]                                                                                                                                                                    12.075553
     Interface Index: 6 (0x00000006)
@@ -1465,7 +1465,8 @@ func (c *client) RegisterBeacons(ifi *Interface) error {
 	_, err := c.get(
 		unix.NL80211_CMD_REGISTER_BEACONS,
 		netlink.Acknowledge,
-		ifi,
+		nil,
+		// ifi,
 		func(ae *netlink.AttributeEncoder) {
 			ae.Uint32(unix.NL80211_ATTR_WIPHY, 0x0)
 		},
@@ -1483,7 +1484,7 @@ func (c *client) SetWiPhy(ifi *Interface, freq uint32) error {
 		netlink.Acknowledge,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
-			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
+			// ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
 			ae.Uint32(unix.NL80211_ATTR_WIPHY_FREQ, freq)
 			ae.Uint32(unix.NL80211_ATTR_WIPHY_CHANNEL_TYPE, 0x0)
 		},
