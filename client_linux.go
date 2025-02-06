@@ -30,8 +30,8 @@ import (
 // netlink, generic netlink, and nl80211 to provide access to WiFi device
 // actions and statistics.
 type client struct {
-	c             *genetlink.Conn
-	multicastConn *genetlink.Conn
+	c *genetlink.Conn
+	// multicastConn *genetlink.Conn
 	familyID      uint16
 	familyVersion uint8
 	groups        []genetlink.MulticastGroup
@@ -70,66 +70,69 @@ func initClient(c *genetlink.Conn) (*client, error) {
 	}
 
 	// conn for multicast updates
-	conn, err := genetlink.Dial(nil)
-	if err != nil {
-		log.Printf("netlink dial failed - %s\n", err)
-		return nil, err
-	}
+	/*
+		conn, err := genetlink.Dial(nil)
+		if err != nil {
+			log.Printf("netlink dial failed - %s\n", err)
+			return nil, err
+		}
 
-	for _, o := range []netlink.ConnOption{
-		netlink.ExtendedAcknowledge,
-		netlink.GetStrictCheck,
-		netlink.NoENOBUFS,
-	} {
-		_ = conn.SetOption(o, true)
-	}
+		for _, o := range []netlink.ConnOption{
+			netlink.ExtendedAcknowledge,
+			netlink.GetStrictCheck,
+			netlink.NoENOBUFS,
+		} {
+			_ = conn.SetOption(o, true)
+		}
+	*/
 
 	for _, group := range family.Groups {
 		log.Printf("FOUND multicast group - %s\n", group.Name)
 		if group.Name == unix.NL80211_MULTICAST_GROUP_SCAN {
-			err = conn.JoinGroup(group.ID)
+			// err = conn.JoinGroup(group.ID)
+			err = c.JoinGroup(group.ID)
 			if err != nil {
 				log.Printf("join group  failed - %s\n", err)
 				return nil, err
 			}
 			log.Printf("joined multicast group - %s\n", group.Name)
 		} else if group.Name == unix.NL80211_MULTICAST_GROUP_MLME {
-			err = conn.JoinGroup(group.ID)
+			err = c.JoinGroup(group.ID)
 			if err != nil {
 				log.Printf("join group  failed - %s\n", err)
 				return nil, err
 			}
 			log.Printf("joined multicast group - %s\n", group.Name)
 		} else if group.Name == unix.NL80211_MULTICAST_GROUP_REG {
-			err = conn.JoinGroup(group.ID)
+			err = c.JoinGroup(group.ID)
 			if err != nil {
 				log.Printf("join group  failed - %s\n", err)
 				return nil, err
 			}
 			log.Printf("joined multicast group - %s\n", group.Name)
 		} else if group.Name == unix.NL80211_MULTICAST_GROUP_VENDOR {
-			err = conn.JoinGroup(group.ID)
+			err = c.JoinGroup(group.ID)
 			if err != nil {
 				log.Printf("join group  failed - %s\n", err)
 				return nil, err
 			}
 			log.Printf("joined multicast group - %s\n", group.Name)
 		} else if group.Name == unix.NL80211_MULTICAST_GROUP_CONFIG {
-			err = conn.JoinGroup(group.ID)
+			err = c.JoinGroup(group.ID)
 			if err != nil {
 				log.Printf("join group  failed - %s\n", err)
 				return nil, err
 			}
 			log.Printf("joined multicast group - %s\n", group.Name)
 		} else if group.Name == unix.NL80211_MULTICAST_GROUP_NAN {
-			err = conn.JoinGroup(group.ID)
+			err = c.JoinGroup(group.ID)
 			if err != nil {
 				log.Printf("join group  failed - %s\n", err)
 				return nil, err
 			}
 			log.Printf("joined multicast group - %s\n", group.Name)
 		} else if group.Name == unix.NL80211_MULTICAST_GROUP_TESTMODE {
-			err = conn.JoinGroup(group.ID)
+			err = c.JoinGroup(group.ID)
 			if err != nil {
 				log.Printf("join group  failed - %s\n", err)
 				return nil, err
@@ -139,8 +142,8 @@ func initClient(c *genetlink.Conn) (*client, error) {
 	}
 
 	return &client{
-		c:             c,
-		multicastConn: conn,
+		c: c,
+		// multicastConn: conn,
 		familyID:      family.ID,
 		familyVersion: family.Version,
 		groups:        family.Groups,
@@ -423,7 +426,8 @@ func (c *client) StartMulticastProcessing() {
 func (c *client) RegisterMulticastGroup(grp string) error {
 	for _, group := range c.groups {
 		if group.Name == grp {
-			err := c.multicastConn.JoinGroup(group.ID)
+			// err := c.multicastConn.JoinGroup(group.ID)
+			err := c.c.JoinGroup(group.ID)
 			if err != nil {
 				log.Printf("join group  failed - %s\n", err)
 				return err
@@ -446,7 +450,8 @@ func checkLayers(p gopacket.Packet, want []gopacket.LayerType) {
 
 func (c *client) processMulticastEvents() {
 	for {
-		genl_msgs, _, err := c.multicastConn.Receive()
+		// genl_msgs, _, err := c.multicastConn.Receive()
+		genl_msgs, _, err := c.c.Receive()
 		if err != nil {
 			log.Printf("netlink multicast event receive failed - %s\n", err)
 			return
