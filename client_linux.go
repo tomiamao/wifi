@@ -17,7 +17,6 @@ import (
 
 	"log"
 
-	"github.com/google/gopacket"
 	"github.com/josharian/native"
 	"github.com/mdlayher/genetlink"
 	"github.com/mdlayher/netlink"
@@ -361,16 +360,6 @@ func (c *client) RegisterMulticastGroup(grp string) error {
 
 func (c *client) StartMulticastProcessing(ctx context.Context) <-chan []genetlink.Message {
 	return c.processMulticastEvents(ctx)
-}
-
-func checkLayers(p gopacket.Packet, want []gopacket.LayerType) {
-	layers := p.Layers()
-	log.Println("Checking packet layers, want", want)
-	for _, l := range layers {
-		log.Printf("  Got layer %v, %d bytes, payload of %d bytes", l.LayerType(),
-			len(l.LayerContents()), len(l.LayerPayload()))
-	}
-	log.Printf("%v\n", p)
 }
 
 func (c *client) processMulticastEvents(ctx context.Context) <-chan []genetlink.Message {
