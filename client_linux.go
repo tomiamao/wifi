@@ -413,7 +413,7 @@ func (c *client) processMulticastEvents(ctx context.Context) <-chan []genetlink.
 func (c *client) SendProbeResponseFrame(ifi *Interface, ssid string, freq uint32, freqChannel byte) error {
 	beaconHead := BeaconHead{
 		ByteOrder: native.Endian,
-		FC:        0x0080, // protocol=0x0, Type=0x0 (mgmt) SubType=0x80 (Beacon), Flags=0x00
+		FC:        0x0050, // protocol=0x0, Type=0x0 (mgmt) SubType=0x50 (Probe Response), Flags=0x00
 		Duration:  0x0,
 		DA:        net.HardwareAddr{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
 		SA:        ifi.HardwareAddr,
