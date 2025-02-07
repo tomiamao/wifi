@@ -343,8 +343,23 @@ func (c *client) Associate(ifi *Interface, apMacAddr net.HardwareAddr, ssid stri
 	return nil
 }
 
-// register multicast event
-func (c *client) RegisterMulticastGroup(grp string) error {
+// leave multicast group
+func (c *client) LeaveMulticastGroup(grp string) error {
+	for _, group := range c.groups {
+		if group.Name == grp {
+			err := c.c.LeaveGroup(group.ID)
+			if err != nil {
+				log.Printf("leave group  failed - %s\n", err)
+				return err
+			}
+			return nil
+		}
+	}
+	return nil
+}
+
+// join multicast group
+func (c *client) JoinMulticastGroup(grp string) error {
 	for _, group := range c.groups {
 		if group.Name == grp {
 			err := c.c.JoinGroup(group.ID)

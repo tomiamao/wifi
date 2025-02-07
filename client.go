@@ -130,8 +130,11 @@ func (c *Client) TriggerScan(ifi *Interface) error {
 	return c.c.TriggerScan(ifi)
 }
 
-func (c *Client) RegisterMulticastGroup(grp string) error {
-	return c.c.RegisterMulticastGroup(grp)
+func (c *Client) JoinMulticastGroup(grp string) error {
+	return c.c.JoinMulticastGroup(grp)
+}
+func (c *Client) LeaveMulticastGroup(grp string) error {
+	return c.c.LeaveMulticastGroup(grp)
 }
 
 func (c *Client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
