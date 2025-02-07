@@ -4,7 +4,6 @@ go 1.22
 
 require (
 	github.com/google/go-cmp v0.6.0
-	github.com/google/gopacket v1.1.19
 	github.com/josharian/native v1.1.0
 	github.com/mdlayher/genetlink v1.3.2
 	github.com/mdlayher/netlink v1.7.3-0.20250113171957-fbb4dce95f42

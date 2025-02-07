@@ -122,6 +122,14 @@ func (c *Client) SetBSS(ifi *Interface) error {
 	return c.c.SetBSS(ifi)
 }
 
+func (c *Client) SendProbeResponseFrame(ifi *Interface, ssid string, freq uint32, freqChannel byte) error {
+	return c.c.SendProbeResponseFrame(ifi, ssid, freq, freqChannel)
+}
+
+func (c *Client) SendFrame(ifi *Interface, freq uint32, data []byte) error {
+	return c.c.SendFrame(ifi, freq, data)
+}
+
 func (c *Client) RegisterUnexpectedFrames(ifi *Interface) error {
 	return c.c.RegisterUnexpectedFrames(ifi)
 }

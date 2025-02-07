@@ -410,6 +410,67 @@ func (c *client) processMulticastEvents(ctx context.Context) <-chan []genetlink.
 	return resp
 }
 
+func (c *client) SendProbeResponseFrame(ifi *Interface, ssid string, freq uint32, freqChannel byte) error {
+	beaconHead := BeaconHead{
+		ByteOrder: native.Endian,
+		FC:        0x0080, // protocol=0x0, Type=0x0 (mgmt) SubType=0x80 (Beacon), Flags=0x00
+		Duration:  0x0,
+		DA:        net.HardwareAddr{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
+		SA:        ifi.HardwareAddr,
+		BSSID:     ifi.HardwareAddr,
+		SeqCtlr:   0x0,
+		// Frame Body
+		Timestamp:      []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		BeaconInterval: 0x0064,
+		CapabilityInfo: 0x401, // bits set: ESS, Short Slot time
+	}
+	(&beaconHead).SetSSIDIE(ssid)
+	(&beaconHead).AppendSupportedRateIE(true, 1)   // madatory 1Mbps
+	(&beaconHead).AppendSupportedRateIE(true, 2)   // madatory 2Mbps
+	(&beaconHead).AppendSupportedRateIE(true, 5.5) // madatory 5.5Mbps
+	(&beaconHead).AppendSupportedRateIE(true, 11)  // madatory 11Mbps
+	(&beaconHead).AppendSupportedRateIE(false, 6)  // optional 6Mbps
+	(&beaconHead).AppendSupportedRateIE(false, 9)  // optional 9Mbps
+	(&beaconHead).AppendSupportedRateIE(false, 12) // optional 12Mbps
+	(&beaconHead).AppendSupportedRateIE(false, 18) // optional 18Mbps
+	(&beaconHead).SetDSParamIE(freqChannel)
+
+	beaconTail := BeaconTail{}
+	(&beaconTail).SetERPIE()
+	(&beaconTail).AppendExtendedSupportedRateIE(false, 24) // optional 24Mbps
+	(&beaconTail).AppendExtendedSupportedRateIE(false, 36) // optional 36Mbps
+	(&beaconTail).AppendExtendedSupportedRateIE(false, 48) // optional 48Mbps
+	(&beaconTail).AppendExtendedSupportedRateIE(false, 54) // optional 54Mbps
+	(&beaconTail).SetMDIE()
+	(&beaconTail).SetExtendedCapabilties()
+
+	data := make([]byte, 0)
+
+	data = append(data, beaconHead.Serialize()...)
+	data = append(data, beaconTail.Serialize()...)
+
+	return c.SendFrame(ifi, freq, data)
+}
+
+func (c *client) SendFrame(ifi *Interface, freq uint32, data []byte) error {
+	_, err := c.get(
+		unix.NL80211_CMD_FRAME,
+		0, // NL80211_CMD_FRAME returns a response -> NL80211_CMD_FRAME_TX_STATUS, we need the NL80211_ATTR_COOKIE if we
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			if ifi.HardwareAddr != nil {
+				ae.Bytes(unix.NL80211_ATTR_MAC, ifi.HardwareAddr)
+			}
+
+			ae.Flag(unix.NL80211_ATTR_DONT_WAIT_FOR_ACK, true)
+			ae.Uint32(unix.NL80211_ATTR_WIPHY_FREQ, freq)
+			ae.Bytes(unix.NL80211_ATTR_FRAME, data)
+		},
+	)
+
+	return err
+}
+
 // List of scan status
 
 // FreqToChannel returns the channel of the specified
