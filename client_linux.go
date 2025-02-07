@@ -5,6 +5,7 @@ package wifi
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha1"
 	"encoding/binary"
 	"encoding/hex"
@@ -17,7 +18,6 @@ import (
 	"log"
 
 	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 	"github.com/josharian/native"
 	"github.com/mdlayher/genetlink"
 	"github.com/mdlayher/netlink"
@@ -30,8 +30,7 @@ import (
 // netlink, generic netlink, and nl80211 to provide access to WiFi device
 // actions and statistics.
 type client struct {
-	c *genetlink.Conn
-	// multicastConn *genetlink.Conn
+	c             *genetlink.Conn
 	familyID      uint16
 	familyVersion uint8
 	groups        []genetlink.MulticastGroup
@@ -69,80 +68,8 @@ func initClient(c *genetlink.Conn) (*client, error) {
 		return nil, err
 	}
 
-	// conn for multicast updates
-	/*
-		conn, err := genetlink.Dial(nil)
-		if err != nil {
-			log.Printf("netlink dial failed - %s\n", err)
-			return nil, err
-		}
-
-		for _, o := range []netlink.ConnOption{
-			netlink.ExtendedAcknowledge,
-			netlink.GetStrictCheck,
-			netlink.NoENOBUFS,
-		} {
-			_ = conn.SetOption(o, true)
-		}
-
-		for _, group := range family.Groups {
-			log.Printf("FOUND multicast group - %s\n", group.Name)
-			if group.Name == unix.NL80211_MULTICAST_GROUP_SCAN {
-				err = conn.JoinGroup(group.ID)
-				if err != nil {
-					log.Printf("join group  failed - %s\n", err)
-					return nil, err
-				}
-				log.Printf("joined multicast group - %s\n", group.Name)
-			} else if group.Name == unix.NL80211_MULTICAST_GROUP_MLME {
-				err = conn.JoinGroup(group.ID)
-				if err != nil {
-					log.Printf("join group  failed - %s\n", err)
-					return nil, err
-				}
-				log.Printf("joined multicast group - %s\n", group.Name)
-			} else if group.Name == unix.NL80211_MULTICAST_GROUP_REG {
-				err = conn.JoinGroup(group.ID)
-				if err != nil {
-					log.Printf("join group  failed - %s\n", err)
-					return nil, err
-				}
-				log.Printf("joined multicast group - %s\n", group.Name)
-			} else if group.Name == unix.NL80211_MULTICAST_GROUP_VENDOR {
-				err = conn.JoinGroup(group.ID)
-				if err != nil {
-					log.Printf("join group  failed - %s\n", err)
-					return nil, err
-				}
-				log.Printf("joined multicast group - %s\n", group.Name)
-			} else if group.Name == unix.NL80211_MULTICAST_GROUP_CONFIG {
-				err = conn.JoinGroup(group.ID)
-				if err != nil {
-					log.Printf("join group  failed - %s\n", err)
-					return nil, err
-				}
-				log.Printf("joined multicast group - %s\n", group.Name)
-			} else if group.Name == unix.NL80211_MULTICAST_GROUP_NAN {
-				err = conn.JoinGroup(group.ID)
-				if err != nil {
-					log.Printf("join group  failed - %s\n", err)
-					return nil, err
-				}
-				log.Printf("joined multicast group - %s\n", group.Name)
-			} else if group.Name == unix.NL80211_MULTICAST_GROUP_TESTMODE {
-				err = conn.JoinGroup(group.ID)
-				if err != nil {
-					log.Printf("join group  failed - %s\n", err)
-					return nil, err
-				}
-				log.Printf("joined multicast group - %s\n", group.Name)
-			}
-		}
-	*/
-
 	return &client{
-		c: c,
-		// multicastConn: conn,
+		c:             c,
 		familyID:      family.ID,
 		familyVersion: family.Version,
 		groups:        family.Groups,
@@ -417,15 +344,10 @@ func (c *client) Associate(ifi *Interface, apMacAddr net.HardwareAddr, ssid stri
 	return nil
 }
 
-func (c *client) StartMulticastProcessing() {
-	go c.processMulticastEvents()
-}
-
 // register multicast event
 func (c *client) RegisterMulticastGroup(grp string) error {
 	for _, group := range c.groups {
 		if group.Name == grp {
-			// err := c.multicastConn.JoinGroup(group.ID)
 			err := c.c.JoinGroup(group.ID)
 			if err != nil {
 				log.Printf("join group  failed - %s\n", err)
@@ -435,6 +357,10 @@ func (c *client) RegisterMulticastGroup(grp string) error {
 		}
 	}
 	return nil
+}
+
+func (c *client) StartMulticastProcessing(ctx context.Context) <-chan []genetlink.Message {
+	return c.processMulticastEvents(ctx)
 }
 
 func checkLayers(p gopacket.Packet, want []gopacket.LayerType) {
@@ -447,216 +373,37 @@ func checkLayers(p gopacket.Packet, want []gopacket.LayerType) {
 	log.Printf("%v\n", p)
 }
 
-func (c *client) processMulticastEvents() {
-	for {
-		// genl_msgs, _, err := c.multicastConn.Receive()
-		genl_msgs, _, err := c.c.Receive()
-		if err != nil {
-			log.Printf("netlink multicast event receive failed - %s\n", err)
-			return
-		}
+func (c *client) processMulticastEvents(ctx context.Context) <-chan []genetlink.Message {
+	resp := make(chan []genetlink.Message)
 
-		log.Printf("Received %d multicast messages...about to process them\n", len(genl_msgs))
-
-		for _, msg := range genl_msgs {
-			log.Printf("Multicast message with %d Command Received\n", msg.Header.Command)
-
-			switch msg.Header.Command {
-			case unix.NL80211_CMD_START_AP:
-				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_START_AP\n")
-				continue
-			case unix.NL80211_CMD_TRIGGER_SCAN:
-				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_TRIGGER_SCAN\n")
-				continue
-			case unix.NL80211_CMD_SCAN_ABORTED:
-				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_SCAN_ABORTED\n")
-				continue
-			case unix.NL80211_CMD_NEW_SCAN_RESULTS:
-				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_NEW_SCAN_RESULTS\n")
-				continue
-			case unix.NL80211_CMD_SCHED_SCAN_STOPPED:
-				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_SCHED_SCAN_STOPPED\n")
-				continue
-			case unix.NL80211_CMD_AUTHENTICATE:
-				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_AUTHENTICATE\n")
-				// extract params
-
-				/*
-					attrs, err := netlink.UnmarshalAttributes(msg.Data)
-					if err != nil {
-						log.Printf("processMulticastEvents() NL80211_CMD_AUTHENTICATE error I - %s\n", err)
+	go func() {
+		for {
+			c.c.SetReadDeadline(time.Now().Add(10 * time.Second))
+			select {
+			case <-ctx.Done():
+				close(resp)
+				return
+			default:
+				genl_msgs, _, err := c.c.Receive()
+				if err != nil {
+					// check if it is a read timeout
+					if err.(*netlink.OpError).Timeout() {
+						log.Printf("netlink multicast event read timeout - %s\n", err)
 						continue
-					}
-				*/
-
-				ad, err := netlink.NewAttributeDecoder(msg.Data)
-				if err != nil {
-					log.Printf("processMulticastEvents() NL80211_CMD_AUTHENTICATE failed to decode attributes I - %s\n", err)
-					continue
-				}
-
-				// Return a nil slice when there are no attributes to decode.
-				if ad.Len() == 0 {
-					log.Printf("processMulticastEvents() NL80211_CMD_AUTHENTICATE No attributes found\n")
-					continue
-				}
-
-				log.Printf("processMulticastEvents() NL80211_CMD_AUTHENTICATE number of attributes found - %d\n", ad.Len())
-
-				// attrs := make([]netlink.Attribute, 0, ad.Len())
-
-				for ad.Next() {
-					aType := ad.Type()
-
-					if aType == unix.NL80211_ATTR_MAC {
-						log.Printf("NL80211_CMD_AUTHENTICATE ATTR_MAC found\n")
-					} else if aType == unix.NL80211_ATTR_FRAME {
-
-						aData := ad.Bytes()
-
-						log.Printf("NL80211_CMD_AUTHENTICATE ATTR_FRAME found actual len - %d\n", len(aData))
-
-						if len(aData) == 0 {
-							log.Printf("NL80211_CMD_AUTHENTICATE ATTR_FRAME no data present\n")
-							continue
-						}
-
-						// parse 802.11 mgmt frame
-						p := gopacket.NewPacket(aData, layers.LinkTypeIEEE802_11, gopacket.NoCopy)
-
-						checkLayers(p, []gopacket.LayerType{layers.LayerTypeDot11})
-
-						if got, ok := p.Layer(layers.LayerTypeDot11).(*layers.Dot11); ok {
-							log.Printf("802.11 packet processed successfully - %v\n", got.Address1)
-						}
-
-						log.Println(hex.EncodeToString(aData[24:26]))
-						log.Println(hex.EncodeToString(aData[26:28]))
-						log.Println(hex.EncodeToString(aData[28:30]))
-
-						d := &layers.Dot11MgmtAuthentication{}
-
-						d.DecodeFromBytes(aData[24:], gopacket.NilDecodeFeedback)
-
-						log.Printf("************ %s - %d - %s", d.Algorithm, d.Sequence, d.Status)
-
-						if d.Status == layers.Dot11StatusSuccess && d.Sequence == 2 && d.Algorithm == layers.Dot11AlgorithmOpen {
-							log.Printf("***** successful authentication....proceeding to association\n")
-						}
-
-					} else if aType == unix.NL80211_ATTR_TIMED_OUT {
-						log.Printf("NL80211_CMD_AUTHENTICATE ATTR_TIMED_OUT found\n")
-					} else if aType == unix.NL80211_ATTR_WIPHY_FREQ {
-						log.Printf("NL80211_CMD_AUTHENTICATE NL80211_ATTR_WIPHY_FREQ found\n")
-					} else if aType == unix.NL80211_ATTR_ACK {
-						log.Printf("NL80211_CMD_AUTHENTICATE NL80211_ATTR_ACK found\n")
-					} else if aType == unix.NL80211_ATTR_COOKIE {
-						log.Printf("NL80211_CMD_AUTHENTICATE NL80211_ATTR_COOKIE found\n")
-					} else if aType == unix.NL80211_ATTR_RX_SIGNAL_DBM {
-						log.Printf("NL80211_CMD_AUTHENTICATE NL80211_ATTR_RX_SIGNAL_DBM found\n")
-					} else if aType == unix.NL80211_ATTR_STA_WME {
-						log.Printf("NL80211_CMD_AUTHENTICATE NL80211_ATTR_STA_WME found\n")
+					} else {
+						log.Printf("netlink multicast event receive failed - %s\n", err)
+						close(resp)
+						return
 					}
 				}
 
-				if err := ad.Err(); err != nil {
-					log.Printf("processMulticastEvents() NL80211_CMD_AUTHENTICATE attribute deocde error - %s\n", err)
-					continue
-				}
-
-				continue
-			case unix.NL80211_CMD_ASSOCIATE:
-				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_ASSOCIATE\n")
-				// extract params
-				attrs, err := netlink.UnmarshalAttributes(msg.Data)
-				if err != nil {
-					log.Printf("processMulticastEvents() NL80211_CMD_ASSOCIATE error I - %s\n", err)
-					continue
-				}
-
-				for _, a := range attrs {
-					if a.Type == unix.NL80211_ATTR_MAC {
-						log.Printf("NL80211_CMD_ASSOCIATE ATTR_MAC found\n")
-					} else if a.Type == unix.NL80211_ATTR_FRAME {
-						log.Printf("NL80211_CMD_ASSOCIATE ATTR_FRAME found\n")
-
-						if len(a.Data) == 0 {
-							log.Printf("NL80211_CMD_ASSOCIATE ATTR_FRAME no data present\n")
-							continue
-						}
-
-						// parse 802.11 mgmt frame
-						p := gopacket.NewPacket(a.Data, layers.LinkTypeIEEE802_11, gopacket.NoCopy)
-
-						checkLayers(p, []gopacket.LayerType{layers.LayerTypeDot11})
-
-						if got, ok := p.Layer(layers.LayerTypeDot11).(*layers.Dot11); ok {
-
-							log.Printf("802.11 packet processed successfully - %v\n", got.Address1)
-
-						}
-
-					} else if a.Type == unix.NL80211_ATTR_TIMED_OUT {
-						log.Printf("NL80211_CMD_ASSOCIATE ATTR_TIMED_OUT found\n")
-					} else if a.Type == unix.NL80211_ATTR_WIPHY_FREQ {
-						log.Printf("NL80211_CMD_ASSOCIATE NL80211_ATTR_WIPHY_FREQ found\n")
-					} else if a.Type == unix.NL80211_ATTR_ACK {
-						log.Printf("NL80211_CMD_ASSOCIATE NL80211_ATTR_ACK found\n")
-					} else if a.Type == unix.NL80211_ATTR_COOKIE {
-						log.Printf("NL80211_CMD_ASSOCIATE NL80211_ATTR_COOKIE found\n")
-					} else if a.Type == unix.NL80211_ATTR_RX_SIGNAL_DBM {
-						log.Printf("NL80211_CMD_ASSOCIATE NL80211_ATTR_RX_SIGNAL_DBM found\n")
-					} else if a.Type == unix.NL80211_ATTR_STA_WME {
-						log.Printf("NL80211_CMD_ASSOCIATE NL80211_ATTR_STA_WME found\n")
-					}
-				}
-				continue
-			case unix.NL80211_CMD_DEAUTHENTICATE:
-				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_DEAUTHENTICATE\n")
-				continue
-			case unix.NL80211_CMD_DISASSOCIATE:
-				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_DISASSOCIATE\n")
-				continue
-			case unix.NL80211_CMD_FRAME_TX_STATUS:
-				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_FRAME_TX_STATUS\n")
-				continue
-			case unix.NL80211_CMD_FRAME:
-				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_FRAME\n")
-
-				attrs, err := netlink.UnmarshalAttributes(msg.Data)
-				if err != nil {
-					log.Printf("processMulticastEvents() NL80211_CMD_FRAME error I - %s\n", err)
-					continue
-				}
-
-				for _, a := range attrs {
-					if a.Type == unix.NL80211_ATTR_MAC {
-						log.Printf("NL80211_CMD_ASSOCIATE ATTR_MAC found\n")
-					} else if a.Type == unix.NL80211_ATTR_FRAME {
-						log.Printf("NL80211_CMD_ASSOCIATE ATTR_FRAME found\n")
-					}
-				}
-				continue
-			case unix.NL80211_CMD_CONNECT:
-				log.Printf("MULTICAST EVENT RECEIVED - NL80211_CMD_CONNECT\n")
-
-				attrs, err := netlink.UnmarshalAttributes(msg.Data)
-				if err != nil {
-					log.Printf("processMulticastEvents() NL80211_CMD_CONNECT error I - %s\n", err)
-					continue
-				}
-
-				for _, a := range attrs {
-					if a.Type == unix.NL80211_ATTR_MAC {
-						log.Printf("NL80211_CMD_CONNECT ATTR_MAC found\n")
-					} else if a.Type == unix.NL80211_ATTR_FRAME {
-						log.Printf("NL80211_CMD_CONNECT ATTR_FRAME found\n")
-					}
-				}
-				continue
+				// stream messages to caller
+				resp <- genl_msgs
 			}
 		}
-	}
+	}()
+
+	return resp
 }
 
 // List of scan status

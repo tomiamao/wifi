@@ -4,9 +4,11 @@
 package wifi
 
 import (
+	"context"
 	"net"
 	"time"
 
+	"github.com/mdlayher/genetlink"
 	"golang.org/x/sys/unix"
 )
 
@@ -88,8 +90,8 @@ func (c *Client) CheckExtFeature(ifi *Interface, feature uint) (bool, error) {
 	return c.c.CheckExtFeature(ifi, feature)
 }
 
-func (c *Client) StartMulticastProcessing() {
-	c.c.StartMulticastProcessing()
+func (c *Client) StartMulticastProcessing(ctx context.Context) <-chan []genetlink.Message {
+	return c.c.StartMulticastProcessing(ctx)
 }
 
 func (c *Client) Authenticate(ifi *Interface, apMacAddr net.HardwareAddr, ssid string, freq uint32) error {
