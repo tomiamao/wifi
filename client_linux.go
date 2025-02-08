@@ -410,12 +410,12 @@ func (c *client) processMulticastEvents(ctx context.Context) <-chan []genetlink.
 	return resp
 }
 
-func (c *client) SendProbeResponseFrame(ifi *Interface, ssid string, freq uint32, freqChannel byte) error {
+func (c *client) SendProbeResponseFrame(ifi *Interface, dstMACAddr net.HardwareAddr, ssid string, freq uint32, freqChannel byte) error {
 	beaconHead := BeaconHead{
 		ByteOrder: native.Endian,
 		FC:        0x0050, // protocol=0x0, Type=0x0 (mgmt) SubType=0x50 (Probe Response), Flags=0x00
 		Duration:  0x0,
-		DA:        net.HardwareAddr{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
+		DA:        dstMACAddr,
 		SA:        ifi.HardwareAddr,
 		BSSID:     ifi.HardwareAddr,
 		SeqCtlr:   0x0,
@@ -458,13 +458,110 @@ func (c *client) SendFrame(ifi *Interface, freq uint32, data []byte) error {
 		0, // NL80211_CMD_FRAME returns a response -> NL80211_CMD_FRAME_TX_STATUS, we need the NL80211_ATTR_COOKIE if we
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
-			if ifi.HardwareAddr != nil {
-				ae.Bytes(unix.NL80211_ATTR_MAC, ifi.HardwareAddr)
-			}
-
+			/*
+				if ifi.HardwareAddr != nil {
+					ae.Bytes(unix.NL80211_ATTR_MAC, ifi.HardwareAddr)
+				}
+			*/
 			ae.Flag(unix.NL80211_ATTR_DONT_WAIT_FOR_ACK, true)
 			ae.Uint32(unix.NL80211_ATTR_WIPHY_FREQ, freq)
 			ae.Bytes(unix.NL80211_ATTR_FRAME, data)
+		},
+	)
+
+	return err
+}
+
+func (c *client) AddStation(ifi *Interface, mac net.HardwareAddr, aid uint16) error {
+	_, err := c.get(
+		unix.NL80211_CMD_NEW_STATION,
+		netlink.Acknowledge,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			ae.Bytes(unix.NL80211_ATTR_MAC, mac)
+			ae.Bytes(unix.NL80211_ATTR_STA_SUPPORTED_RATES, []byte{0x02, 0x04, 0x0B, 0x16}) // TODO:tomiamao hardcoded
+			ae.Uint16(unix.NL80211_ATTR_STA_CAPABILITY, 0)
+			ae.Uint16(unix.NL80211_ATTR_STA_AID, aid)
+			ae.Uint16(unix.NL80211_ATTR_STA_LISTEN_INTERVAL, 0)
+
+			/*
+				* @NL80211_STA_FLAG_AUTHORIZED: station is authorized (802.1X)
+				 * @NL80211_STA_FLAG_SHORT_PREAMBLE: station is capable of receiving frames
+				 *	with short barker preamble
+				 * @NL80211_STA_FLAG_WME: station is WME/QoS capable
+				 * @NL80211_STA_FLAG_MFP: station uses management frame protection
+				 * @NL80211_STA_FLAG_AUTHENTICATED: station is authenticated
+				 * @NL80211_STA_FLAG_TDLS_PEER: station is a TDLS peer -- this flag should
+				 *	only be used in managed mode (even in the flags mask). Note that the
+				 *	flag can't be changed, it is only valid while adding a station, and
+				 *	attempts to change it will silently be ignored (rather than rejected
+				 *	as errors.)
+				 * @NL80211_STA_FLAG_ASSOCIATED: station is associated; used with drivers
+				 *	that support %NL80211_FEATURE_FULL_AP_CLIENT_STATE to transition a
+				 *	previously added station into associated state
+
+				 // Bit mapping
+								NL80211_STA_FLAG_AUTHORIZED,      ---------> 1
+								NL80211_STA_FLAG_SHORT_PREAMBLE, ---------> 2
+								NL80211_STA_FLAG_WME,            ---------> 3
+								NL80211_STA_FLAG_MFP,            ---------> 4
+								NL80211_STA_FLAG_AUTHENTICATED,  ---------> 5
+								NL80211_STA_FLAG_TDLS_PEER,      ---------> 6
+								NL80211_STA_FLAG_ASSOCIATED,     ---------> 7
+
+			*/
+
+			/**
+			 * struct nl80211_sta_flag_update - station flags mask/set
+			 * @mask: mask of station flags to set
+			 * @set: which values to set them to
+			 *
+			 * Both mask and set contain bits as per &enum nl80211_sta_flags.
+
+			struct nl80211_sta_flag_update {
+				__u32 mask;
+				__u32 set;
+			} __attribute__((packed));
+			*/
+
+			var mask uint64 = unix.NL80211_STA_FLAG_AUTHENTICATED | unix.NL80211_STA_FLAG_ASSOCIATED
+			var set uint64 = 0
+
+			ae.Uint64(unix.NL80211_ATTR_STA_FLAGS2, ((mask << 32) | set))
+		},
+	)
+
+	return err
+}
+
+// update an existing station
+func (c *client) SetStation(ifi *Interface, mac net.HardwareAddr, aid, staCap, listenInterval uint16, suppRates []byte, mask, set uint64) error {
+	_, err := c.get(
+		unix.NL80211_CMD_SET_STATION,
+		netlink.Acknowledge,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			ae.Bytes(unix.NL80211_ATTR_MAC, mac)
+
+			ae.Bytes(unix.NL80211_ATTR_STA_SUPPORTED_RATES, suppRates)
+			ae.Uint16(unix.NL80211_ATTR_STA_CAPABILITY, staCap)
+			ae.Uint16(unix.NL80211_ATTR_STA_AID, aid)
+			ae.Uint16(unix.NL80211_ATTR_STA_LISTEN_INTERVAL, listenInterval)
+
+			ae.Uint64(unix.NL80211_ATTR_STA_FLAGS2, ((mask << 32) | set))
+		},
+	)
+
+	return err
+}
+
+func (c *client) DelStation(ifi *Interface, mac net.HardwareAddr) error {
+	_, err := c.get(
+		unix.NL80211_CMD_DEL_STATION,
+		netlink.Acknowledge,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			ae.Bytes(unix.NL80211_ATTR_MAC, mac)
 		},
 	)
 
@@ -504,7 +601,7 @@ type BeaconHead struct {
 	DA       net.HardwareAddr
 	SA       net.HardwareAddr
 	BSSID    net.HardwareAddr
-	SeqCtlr  uint16 // len 2
+	SeqCtlr  uint16 // len 2 bytes -> Fragment number (4 bits) + Sequence number (12 bits)
 	// Frame Body
 	// Fixed Fields
 	Timestamp      []byte // len 8

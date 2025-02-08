@@ -122,8 +122,20 @@ func (c *Client) SetBSS(ifi *Interface) error {
 	return c.c.SetBSS(ifi)
 }
 
-func (c *Client) SendProbeResponseFrame(ifi *Interface, ssid string, freq uint32, freqChannel byte) error {
-	return c.c.SendProbeResponseFrame(ifi, ssid, freq, freqChannel)
+func (c *Client) AddStation(ifi *Interface, mac net.HardwareAddr, aid uint16) error {
+	return c.c.AddStation(ifi, mac, aid)
+}
+
+func (c *Client) SetStation(ifi *Interface, mac net.HardwareAddr, aid, staCap, listenInterval uint16, suppRates []byte, mask, set uint64) error {
+	return c.c.SetStation(ifi, mac, aid, staCap, listenInterval, suppRates, mask, set)
+}
+
+func (c *Client) DelStation(ifi *Interface, mac net.HardwareAddr) error {
+	return c.c.DelStation(ifi, mac)
+}
+
+func (c *Client) SendProbeResponseFrame(ifi *Interface, dstMACAddr net.HardwareAddr, ssid string, freq uint32, freqChannel byte) error {
+	return c.c.SendProbeResponseFrame(ifi, dstMACAddr, ssid, freq, freqChannel)
 }
 
 func (c *Client) SendFrame(ifi *Interface, freq uint32, data []byte) error {
