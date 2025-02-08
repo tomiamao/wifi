@@ -467,11 +467,7 @@ func (c *client) SendAuthResponseFrame(ifi *Interface, dstMACAddr net.HardwareAd
 		Status:    status,
 	}
 
-	data := make([]byte, 0)
-
-	data = append(data, authResp.Serialize()...)
-
-	return c.SendFrame(ifi, freq, data)
+	return c.SendFrame(ifi, freq, authResp.Serialize())
 }
 
 func (c *client) SendAssocResponseFrame(ifi *Interface, dstMACAddr net.HardwareAddr, freq uint32, aid, capInfo, status uint16) error {
@@ -489,11 +485,25 @@ func (c *client) SendAssocResponseFrame(ifi *Interface, dstMACAddr net.HardwareA
 		AID:            aid,
 	}
 
-	data := make([]byte, 0)
+	(&assocResp).AppendSupportedRateIE(true, 1)   // madatory 1Mbps
+	(&assocResp).AppendSupportedRateIE(true, 2)   // madatory 2Mbps
+	(&assocResp).AppendSupportedRateIE(true, 5.5) // madatory 5.5Mbps
+	(&assocResp).AppendSupportedRateIE(true, 11)  // madatory 11Mbps
+	(&assocResp).AppendSupportedRateIE(false, 6)  // optional 6Mbps
+	(&assocResp).AppendSupportedRateIE(false, 9)  // optional 9Mbps
+	(&assocResp).AppendSupportedRateIE(false, 12) // optional 12Mbps
+	(&assocResp).AppendSupportedRateIE(false, 18) // optional 18Mbps
 
-	data = append(data, assocResp.Serialize()...)
+	(&assocResp).AppendExtendedSupportedRateIE(false, 24) // optional 24Mbps
+	(&assocResp).AppendExtendedSupportedRateIE(false, 36) // optional 36Mbps
+	(&assocResp).AppendExtendedSupportedRateIE(false, 48) // optional 48Mbps
+	(&assocResp).AppendExtendedSupportedRateIE(false, 54) // optional 54Mbps
 
-	return c.SendFrame(ifi, freq, data)
+	(&assocResp).SetExtendedCapabilties()
+
+	(&assocResp).SetBSSMaxIdlePeriod()
+
+	return c.SendFrame(ifi, freq, assocResp.Serialize())
 }
 
 func (c *client) SendFrame(ifi *Interface, freq uint32, data []byte) error {
