@@ -138,6 +138,14 @@ func (c *Client) SendProbeResponseFrame(ifi *Interface, dstMACAddr net.HardwareA
 	return c.c.SendProbeResponseFrame(ifi, dstMACAddr, ssid, freq, freqChannel)
 }
 
+func (c *Client) SendAuthResponseFrame(ifi *Interface, dstMACAddr net.HardwareAddr, freq uint32, algo, status uint16) error {
+	return c.c.SendAuthResponseFrame(ifi, dstMACAddr, freq, algo, status)
+}
+
+func (c *Client) SendAssocResponseFrame(ifi *Interface, dstMACAddr net.HardwareAddr, freq uint32, aid, capInfo, status uint16) error {
+	return c.c.SendAssocResponseFrame(ifi, dstMACAddr, freq, aid, capInfo, status)
+}
+
 func (c *Client) SendFrame(ifi *Interface, freq uint32, data []byte) error {
 	return c.c.SendFrame(ifi, freq, data)
 }

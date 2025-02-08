@@ -452,6 +452,50 @@ func (c *client) SendProbeResponseFrame(ifi *Interface, dstMACAddr net.HardwareA
 	return c.SendFrame(ifi, freq, data)
 }
 
+func (c *client) SendAuthResponseFrame(ifi *Interface, dstMACAddr net.HardwareAddr, freq uint32, algo, status uint16) error {
+	authResp := AuthResp{
+		ByteOrder: native.Endian,
+		FC:        0x0050, // protocol=0x0, Type=0x0 (mgmt) SubType=0x50 (Probe Response), Flags=0x00
+		Duration:  0x0,
+		DA:        dstMACAddr,
+		SA:        ifi.HardwareAddr,
+		BSSID:     ifi.HardwareAddr,
+		SeqCtlr:   0x0,
+		// Frame Body
+		Algorithm: algo,
+		Sequence:  0,
+		Status:    status,
+	}
+
+	data := make([]byte, 0)
+
+	data = append(data, authResp.Serialize()...)
+
+	return c.SendFrame(ifi, freq, data)
+}
+
+func (c *client) SendAssocResponseFrame(ifi *Interface, dstMACAddr net.HardwareAddr, freq uint32, aid, capInfo, status uint16) error {
+	assocResp := AssocResp{
+		ByteOrder: native.Endian,
+		FC:        0x0050, // protocol=0x0, Type=0x0 (mgmt) SubType=0x50 (Probe Response), Flags=0x00
+		Duration:  0x0,
+		DA:        dstMACAddr,
+		SA:        ifi.HardwareAddr,
+		BSSID:     ifi.HardwareAddr,
+		SeqCtlr:   0x0,
+		// Frame Body
+		CapabilityInfo: capInfo,
+		Status:         status,
+		AID:            aid,
+	}
+
+	data := make([]byte, 0)
+
+	data = append(data, assocResp.Serialize()...)
+
+	return c.SendFrame(ifi, freq, data)
+}
+
 func (c *client) SendFrame(ifi *Interface, freq uint32, data []byte) error {
 	_, err := c.get(
 		unix.NL80211_CMD_FRAME,
