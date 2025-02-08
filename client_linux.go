@@ -455,7 +455,7 @@ func (c *client) SendProbeResponseFrame(ifi *Interface, dstMACAddr net.HardwareA
 func (c *client) SendAuthResponseFrame(ifi *Interface, dstMACAddr net.HardwareAddr, freq uint32, algo, status uint16) error {
 	authResp := AuthResp{
 		ByteOrder: native.Endian,
-		FC:        0x0050, // protocol=0x0, Type=0x0 (mgmt) SubType=0x50 (Probe Response), Flags=0x00
+		FC:        0x00B0, // protocol=0x0, Type=0x0 (mgmt) SubType=0xB0 (Auth Response), Flags=0x00
 		Duration:  0x0,
 		DA:        dstMACAddr,
 		SA:        ifi.HardwareAddr,
@@ -477,7 +477,7 @@ func (c *client) SendAuthResponseFrame(ifi *Interface, dstMACAddr net.HardwareAd
 func (c *client) SendAssocResponseFrame(ifi *Interface, dstMACAddr net.HardwareAddr, freq uint32, aid, capInfo, status uint16) error {
 	assocResp := AssocResp{
 		ByteOrder: native.Endian,
-		FC:        0x0050, // protocol=0x0, Type=0x0 (mgmt) SubType=0x50 (Probe Response), Flags=0x00
+		FC:        0x0010, // protocol=0x0, Type=0x0 (mgmt) SubType=0x10 (Assoc Response), Flags=0x00
 		Duration:  0x0,
 		DA:        dstMACAddr,
 		SA:        ifi.HardwareAddr,
