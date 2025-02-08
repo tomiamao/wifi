@@ -463,7 +463,7 @@ func (c *client) SendAuthResponseFrame(ifi *Interface, dstMACAddr net.HardwareAd
 		SeqCtlr:   0x0,
 		// Frame Body
 		Algorithm: algo,
-		Sequence:  0,
+		Sequence:  2,
 		Status:    status,
 	}
 
