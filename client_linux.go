@@ -568,10 +568,10 @@ func (c *client) AddStation(ifi *Interface, mac net.HardwareAddr, aid uint16) er
 			} __attribute__((packed));
 			*/
 
-			var mask uint64 = unix.NL80211_STA_FLAG_AUTHENTICATED | unix.NL80211_STA_FLAG_ASSOCIATED
+			var mask uint64 = (1 << unix.NL80211_STA_FLAG_AUTHENTICATED) | (1 << unix.NL80211_STA_FLAG_ASSOCIATED)
 			var set uint64 = 0
 
-			ae.Uint64(unix.NL80211_ATTR_STA_FLAGS2, ((mask << 32) | set))
+			ae.Uint64(unix.NL80211_ATTR_STA_FLAGS2, ((set << 32) | mask))
 		},
 	)
 
@@ -592,7 +592,7 @@ func (c *client) SetStation(ifi *Interface, mac net.HardwareAddr, aid, staCap, l
 			ae.Uint16(unix.NL80211_ATTR_STA_AID, aid)
 			ae.Uint16(unix.NL80211_ATTR_STA_LISTEN_INTERVAL, listenInterval)
 
-			ae.Uint64(unix.NL80211_ATTR_STA_FLAGS2, ((mask << 32) | set))
+			ae.Uint64(unix.NL80211_ATTR_STA_FLAGS2, ((set << 32) | mask))
 		},
 	)
 
