@@ -182,5 +182,10 @@ func (b AssocResp) Serialize() []byte {
 	b.ByteOrder.PutUint16(aid, b.AID)
 	data = append(data, aid...)
 
+	data = append(data, b.SupportedRates...)
+	data = append(data, b.ExtendedSupportedRates...)
+	data = append(data, b.ExtendedCapabilties...)
+	data = append(data, b.BSSMaxIdlePeriod...)
+
 	return data
 }
