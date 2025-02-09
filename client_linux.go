@@ -517,7 +517,7 @@ func (c *client) SendFrame(ifi *Interface, freq uint32, data []byte) error {
 					ae.Bytes(unix.NL80211_ATTR_MAC, ifi.HardwareAddr)
 				}
 			*/
-			ae.Flag(unix.NL80211_ATTR_DONT_WAIT_FOR_ACK, true)
+			// ae.Flag(unix.NL80211_ATTR_DONT_WAIT_FOR_ACK, true)
 			ae.Uint32(unix.NL80211_ATTR_WIPHY_FREQ, freq)
 			ae.Bytes(unix.NL80211_ATTR_FRAME, data)
 		},
