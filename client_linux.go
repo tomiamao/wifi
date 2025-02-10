@@ -482,7 +482,7 @@ func (c *client) SendAssocResponseFrame(ifi *Interface, dstMACAddr net.HardwareA
 		// Frame Body
 		CapabilityInfo: capInfo,
 		Status:         status,
-		AID:            aid,
+		AID:            (0xC000 | aid), // first 2 bits of AID are set to 1
 	}
 
 	(&assocResp).AppendSupportedRateIE(true, 1)   // madatory 1Mbps
