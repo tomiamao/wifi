@@ -130,6 +130,10 @@ func (c *Client) SetStation(ifi *Interface, mac net.HardwareAddr, aid, staCap, l
 	return c.c.SetStation(ifi, mac, aid, staCap, listenInterval, suppRates, mask, set)
 }
 
+func (c *Client) SetStationFlags(ifi *Interface, mac net.HardwareAddr, mask, set uint64) error {
+	return c.c.SetStationFlags(ifi, mac, mask, set)
+}
+
 func (c *Client) DelStation(ifi *Interface, mac net.HardwareAddr) error {
 	return c.c.DelStation(ifi, mac)
 }
