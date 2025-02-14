@@ -1726,9 +1726,10 @@ func (c *client) SetBSS(ifi *Interface) error {
 			ae.Uint8(unix.NL80211_ATTR_BSS_SHORT_PREAMBLE, 0x0)
 			ae.Uint8(unix.NL80211_ATTR_BSS_SHORT_SLOT_TIME, 0x1)
 			ae.Uint8(unix.NL80211_ATTR_AP_ISOLATE, 0x0)
-			ae.Uint32(unix.NL80211_ATTR_BSS_BASIC_RATES, 0x160b0402) //  02 04 0b 16
+			// ae.Uint32(unix.NL80211_ATTR_BSS_BASIC_RATES, 0x160b0402) //  02 04 0b 16  // 2.4GHz only
 
-			ae.Uint16(unix.NL80211_ATTR_BSS_HT_OPMODE, 0x0) // 5GHz only
+			ae.Bytes(unix.NL80211_ATTR_BSS_BASIC_RATES, []byte{0x0C, 0x18, 0x30}) //  0x0C, 0x18, 0x30  // 5GHz only
+			ae.Uint16(unix.NL80211_ATTR_BSS_HT_OPMODE, 0x0)                       // 5GHz only
 		},
 	)
 	if err != nil {
