@@ -180,6 +180,10 @@ func (c *Client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
 	return c.c.StartAP(ifi, ssid, freqChannel)
 }
 
+func (c *Client) StartAP5GHz(ifi *Interface, ssid string, freqChannel byte) error {
+	return c.c.StartAP5GHz(ifi, ssid, freqChannel)
+}
+
 func (c *Client) StopAP(ifi *Interface) error {
 	return c.c.StopAP(ifi)
 }
