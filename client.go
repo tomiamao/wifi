@@ -113,8 +113,8 @@ func (c *Client) GetWiPhy(ifi *Interface) error {
 	return c.c.GetWiPhy(ifi)
 }
 
-func (c *Client) SetWiPhy(ifi *Interface, freq, width, centreFreq uint32) error {
-	return c.c.SetWiPhy(ifi, freq, width, centreFreq)
+func (c *Client) SetWiPhy(ifi *Interface, freq, centreFreq, width uint32) error {
+	return c.c.SetWiPhy(ifi, freq, centreFreq, width)
 }
 
 func (c *Client) SetTXQParams(ifi *Interface, queue uint8, aifs uint8, cw_min, cw_max, burst_time uint16) error {
