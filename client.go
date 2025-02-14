@@ -86,6 +86,13 @@ func (c *Client) SetWriteDeadline(t time.Time) error {
 //*******************************
 // ADDITIONS START
 
+func (c *Client) SetRegulatoryDomain(alpha2 string) error {
+	return c.c.SetRegulatoryDomain(alpha2)
+}
+func (c *Client) GetRegulatoryDomain(ifi *Interface) error {
+	return c.c.GetRegulatoryDomain(ifi)
+}
+
 func (c *Client) CheckExtFeature(ifi *Interface, feature uint) (bool, error) {
 	return c.c.CheckExtFeature(ifi, feature)
 }
@@ -106,8 +113,8 @@ func (c *Client) GetWiPhy(ifi *Interface) error {
 	return c.c.GetWiPhy(ifi)
 }
 
-func (c *Client) SetWiPhy(ifi *Interface, freq uint32) error {
-	return c.c.SetWiPhy(ifi, freq)
+func (c *Client) SetWiPhy(ifi *Interface, freq, width, centreFreq uint32) error {
+	return c.c.SetWiPhy(ifi, freq, width, centreFreq)
 }
 
 func (c *Client) SetTXQParams(ifi *Interface, queue uint8, aifs uint8, cw_min, cw_max, burst_time uint16) error {

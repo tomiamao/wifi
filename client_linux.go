@@ -293,6 +293,42 @@ func (c *client) StationInfo(ifi *Interface) ([]*StationInfo, error) {
 // *******************************
 // ADDITIONS START
 
+func (c *client) SetRegulatoryDomain(alpha2 string) error {
+	_, err := c.get(
+		unix.NL80211_CMD_REQ_SET_REG,
+		netlink.Acknowledge,
+		nil,
+		func(ae *netlink.AttributeEncoder) {
+			ae.Bytes(unix.NL80211_ATTR_REG_ALPHA2, []byte(alpha2))
+		},
+	)
+
+	return err
+}
+
+func (c *client) GetRegulatoryDomain(ifi *Interface) error {
+	msgs, err := c.get(
+		unix.NL80211_CMD_GET_REG,
+		0,
+		nil,
+		func(ae *netlink.AttributeEncoder) {
+		},
+	)
+
+	for _, m := range msgs {
+		attrs, err := netlink.UnmarshalAttributes(m.Data)
+		if err != nil {
+			return err
+		}
+
+		if err := ifi.parseAttributes(attrs); err != nil {
+			return err
+		}
+	}
+
+	return err
+}
+
 func (c *client) Authenticate(ifi *Interface, apMacAddr net.HardwareAddr, ssid string, freq uint32) error {
 	_, err := c.get(
 		unix.NL80211_CMD_AUTHENTICATE,
@@ -324,7 +360,7 @@ func (c *client) Associate(ifi *Interface, apMacAddr net.HardwareAddr, ssid stri
 		netlink.Acknowledge,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
-			ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
+			// ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
 			ae.Uint32(unix.NL80211_ATTR_WIPHY_FREQ, freq)
 			ae.Bytes(unix.NL80211_ATTR_MAC, apMacAddr)
 			ae.Bytes(unix.NL80211_ATTR_SSID, []byte(ssid))
@@ -336,11 +372,8 @@ func (c *client) Associate(ifi *Interface, apMacAddr net.HardwareAddr, ssid stri
 			ae.Uint32(unix.NL80211_ATTR_AKM_SUITES, akmSuites)
 		},
 	)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 // leave multicast group
@@ -655,7 +688,7 @@ func ChannelToFreq5GHz(channel int) int {
 	return (channel + 1000) * 5
 }
 
-func ChannelToFreq2Ghz(channel int) int {
+func ChannelToFreq2GHz(channel int) int {
 	if channel == 14 {
 		return 2484
 	}
@@ -978,6 +1011,52 @@ Ours
 *	Information Elements
 *	https://www.nsnam.org/docs/release/3.15/doxygen/wifi-information-element_8h_source.html
  */
+
+/*
+
+ < Request: Start AP (0x0f) len 292 [ack]                                                                                                                                                                     7.990268
+    Interface Index: 6 (0x00000006)
+    Beacon Head: len 58
+        80 00 00 00 ff ff ff ff ff ff 04 f0 21 b5 9b 48  ............!..H
+        04 f0 21 b5 9b 48 00 00 00 00 00 00 00 00 00 00  ..!..H..........
+        64 00 01 00 00 07 42 6f 78 57 69 46 69 01 08 8c  d.....BoxWiFi...
+        12 98 24 b0 48 60 6c 03 01 28                    ..$.H`l..(
+    Beacon Tail: len 123
+        32 02 ff fe 3b 02 80 00 2d 1a 6e 08 1b ff ff 00  2...;...-.n.....
+        00 00 00 00 00 00 00 00 00 01 00 00 00 00 00 00  ................
+        00 00 00 00 3d 16 28 07 00 00 00 00 00 00 00 00  ....=.(.........
+        00 00 00 00 00 00 00 00 00 00 00 00 7f 08 04 00  ................
+        00 02 00 00 00 40 bf 0c a2 00 00 00 fa ff 00 00  .....@..........
+        fa ff 00 00 c0 05 01 2a 00 fc ff c3 04 02 2e 2e  .......*........
+        2e dd 18 00 50 f2 02 01 01 01 00 03 a4 00 00 27  ....P..........'
+        a4 00 00 42 43 5e 00 62 32 2f 00                 ...BC^.b2/.
+    Beacon Interval: 100 (0x00000064)
+    DTIM Period: 2 (0x00000002)
+    SSID: len 7
+        42 6f 78 57 69 46 69                             BoxWiFi
+    Hidden SSID: 0 (0x00000000)
+    Reserved: len 1
+        00                                               .
+    Information Elements: len 10
+        Extended Capabilities: len 8
+            Capability: bit  2: Extended channel switching
+            Capability: bit 25: SSID list
+            Capability: bit 62: Opmode Notification
+            04 00 00 02 00 00 00 40                          .......@
+    IE Probe Response: len 10
+        Extended Capabilities: len 8
+            Capability: bit  2: Extended channel switching
+            Capability: bit 25: SSID list
+            Capability: bit 62: Opmode Notification
+            04 00 00 02 00 00 00 40                          .......@
+    IE Assoc Response: len 10
+        Extended Capabilities: len 8
+            Capability: bit  2: Extended channel switching
+            Capability: bit 25: SSID list
+            Capability: bit 62: Opmode Notification
+            04 00 00 02 00 00 00 40                          .......@
+
+*/
 
 // use channel 6 in the 2.4GHz spectrum - specify 6 for freqChannel
 func (c *client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
@@ -1417,6 +1496,17 @@ func (c *client) SetTXQParams(ifi *Interface, queue uint8, aifs uint8, cw_min, c
 	return err
 }
 
+/*
+< Request: Set BSS (0x19) len 48 [ack]                                                                                                                                                                       7.998623
+
+	Interface Index: 6 (0x00000006)
+	BSS CTS Protection: 0 (0x00)
+	BSS Short Preamble: 0 (0x00)
+	BSS HT Operation Mode: 0 (0x0000)
+	AP Isolate: 0 (0x00)
+	BSS Basic Rates: len 3
+	    0c 18 30
+*/
 func (c *client) SetBSS(ifi *Interface) error {
 	_, err := c.get(
 		unix.NL80211_CMD_SET_BSS,
@@ -1469,14 +1559,24 @@ func (c *client) RegisterBeacons(ifi *Interface) error {
 	return nil
 }
 
-func (c *client) SetWiPhy(ifi *Interface, freq uint32) error {
+/*
+< Request: Set Wiphy (0x02) len 32 [ack]                                                                                                                                                                     7.986746
+    Interface Index: 6 (0x00000006)
+    Wiphy Frequency: 5200 (0x00001450)
+    Channel Width: 3 (0x00000003)
+    Center Frequency 1: 5210 (0x0000145a)
+*/
+
+func (c *client) SetWiPhy(ifi *Interface, freq, width, centreFreq uint32) error {
 	_, err := c.get(
 		unix.NL80211_CMD_SET_WIPHY,
 		netlink.Acknowledge,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			ae.Uint32(unix.NL80211_ATTR_WIPHY_FREQ, freq)
-			ae.Uint32(unix.NL80211_ATTR_WIPHY_CHANNEL_TYPE, 0x0)
+			ae.Uint32(unix.NL80211_ATTR_CHANNEL_WIDTH, width)
+			ae.Uint32(unix.NL80211_ATTR_CENTER_FREQ1, centreFreq)
+			// ae.Uint32(unix.NL80211_ATTR_WIPHY_CHANNEL_TYPE, 0x0) // deprecated
 		},
 	)
 	if err != nil {
@@ -1615,6 +1715,12 @@ func (ifi *Interface) parseAttributes(attrs []netlink.Attribute) error {
 			ifi.Device = int(nlenc.Uint64(a.Data))
 		case unix.NL80211_ATTR_WIPHY_FREQ:
 			ifi.Frequency = int(nlenc.Uint32(a.Data))
+		case unix.NL80211_ATTR_REG_ALPHA2:
+			ifi.RegDom.Alpha2 = nlenc.String(a.Data)
+		case unix.NL80211_ATTR_DFS_REGION:
+			ifi.RegDom.DFSRegion = byte(a.Data[0])
+		case unix.NL80211_ATTR_REG_RULES:
+			ifi.RegDom.Rules = a.Data
 		}
 	}
 

@@ -102,6 +102,12 @@ func (t InterfaceType) String() string {
 	}
 }
 
+type RegDom struct {
+	Alpha2    string
+	DFSRegion byte
+	Rules     []byte
+}
+
 // An Interface is a WiFi network interface.
 type Interface struct {
 	// The index of the interface.
@@ -124,6 +130,9 @@ type Interface struct {
 
 	// The interface's wireless frequency in MHz.
 	Frequency int
+
+	// regulatory domain
+	RegDom RegDom
 }
 
 // StationInfo contains statistics about a WiFi interface operating in
