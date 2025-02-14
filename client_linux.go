@@ -1059,6 +1059,7 @@ Ours
 */
 
 // use channel 6 in the 2.4GHz spectrum - specify 6 for freqChannel
+// use channel 40 in the 5GHz spectrum - specify 40 for freqChannel
 func (c *client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
 	_, err := c.get(
 		unix.NL80211_CMD_START_AP,
@@ -1099,6 +1100,173 @@ func (c *client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
 			(&beaconTail).AppendExtendedSupportedRateIE(false, 54) // optional 54Mbps
 			(&beaconTail).SetMDIE()
 			(&beaconTail).SetExtendedCapabilties()
+			ae.Bytes(unix.NL80211_ATTR_BEACON_TAIL, beaconTail.Serialize())
+
+			ae.Uint32(unix.NL80211_ATTR_BEACON_INTERVAL, uint32(100)) // 100 TU  ==> 102.4ms
+			// About TIM & DTIM ----> https://community.arubanetworks.com/blogs/gstefanick1/2016/01/25/80211-tim-and-dtim-information-elements
+			ae.Uint32(unix.NL80211_ATTR_DTIM_PERIOD, uint32(2)) // A DTIM period field of 2 indicates every 2nd beacon is a DTIM.
+
+			ae.Bytes(unix.NL80211_ATTR_SSID, []byte(ssid))
+			ae.Uint32(unix.NL80211_ATTR_HIDDEN_SSID, uint32(unix.NL80211_HIDDEN_SSID_NOT_IN_USE))
+
+			// ae.Uint32(unix.NL80211_ATTR_AUTH_TYPE, unix.NL80211_AUTHTYPE_OPEN_SYSTEM)
+
+			// ae.Flag(unix.NL80211_ATTR_PRIVACY, false)
+
+			// TODO: figure out what these values mean
+			ae.Bytes(unix.NL80211_ATTR_IE, []byte{0x7F, 0x8, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
+			ae.Bytes(unix.NL80211_ATTR_IE_PROBE_RESP, []byte{0x7F, 0x8, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
+			ae.Bytes(unix.NL80211_ATTR_IE_ASSOC_RESP, []byte{0x7F, 0x8, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
+
+			support, err := c.CheckExtFeature(ifi, unix.NL80211_EXT_FEATURE_CONTROL_PORT_OVER_NL80211)
+			if err != nil {
+				log.Printf("checkExtFeature NL80211_EXT_FEATURE_CONTROL_PORT_OVER_NL80211 error - %s\n", err)
+			}
+			if !support {
+				log.Printf("checkExtFeature NL80211_EXT_FEATURE_CONTROL_PORT_OVER_NL80211 NOT supported\n")
+			} else {
+				log.Printf("checkExtFeature NL80211_EXT_FEATURE_CONTROL_PORT_OVER_NL80211 supported\n")
+				/*
+				   l_genl_msg_append_attr(cmd, NL80211_ATTR_SOCKET_OWNER, 0, NULL);
+				   		l_genl_msg_append_attr(cmd,
+				   				NL80211_ATTR_CONTROL_PORT_OVER_NL80211,
+				   				0, NULL);
+				*/
+				// ae.Flag(unix.NL80211_ATTR_SOCKET_OWNER, true)
+				// ae.Flag(unix.NL80211_ATTR_CONTROL_PORT_OVER_NL80211, true)
+			}
+		},
+	)
+
+	return err
+}
+
+type BeaconTail2 struct {
+	FirstElement        []byte // ID: 0x32 len: 2
+	SecondElement       []byte // ID: 0x3b len: 2
+	ThirdElement        []byte // ID: 0x2d len: 26
+	FourthElement       []byte // ID: 0x3d len: 22
+	ExtendedCapabilties []byte
+	SixthElement        []byte // ID: 0xbf len: 12
+	SeventhElement      []byte // ID: 0xc0 len: 5
+	EighthElement       []byte // ID: 0xc3 len: 4
+	NinthElement        []byte // ID: 0xdd len: 24
+}
+
+func (b *BeaconTail2) FirstElementIE() error {
+	b.FirstElement = make([]byte, 0)
+	b.FirstElement = append(b.FirstElement, 0x32, 0x02, 0xFF, 0xFE) // element ID, length, params
+	return nil
+}
+
+func (b *BeaconTail2) SecondElementIE() error {
+	b.SecondElement = make([]byte, 0)
+	b.SecondElement = append(b.SecondElement, 0x3B, 0x02, 0x80, 0x00) // element ID, length, params
+	return nil
+}
+
+func (b *BeaconTail2) ThirdElementIE() error {
+	b.ThirdElement = make([]byte, 0)
+	b.ThirdElement = append(b.ThirdElement, 0x2D, 0x1A, 0x6e, 0x08, 0x1b, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00) // element ID, length, params
+	return nil
+}
+
+func (b *BeaconTail2) FourthElementIE() error {
+	b.FourthElement = make([]byte, 0)
+	b.FourthElement = append(b.FourthElement, 0x3D, 0x16, 0x28, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00) // element ID, length, params
+	return nil
+}
+
+func (b *BeaconTail2) SetExtendedCapabilties() error {
+	b.ExtendedCapabilties = make([]byte, 0)
+	b.ExtendedCapabilties = append(b.ExtendedCapabilties, 0x7F, 0x8, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40) // element ID, length, Extended capabilites
+	return nil
+}
+
+func (b *BeaconTail2) SixthElementIE() error {
+	b.SixthElement = make([]byte, 0)
+	b.SixthElement = append(b.SixthElement, 0xBF, 0x0C, 0xa2, 0x00, 0x00, 0x00, 0xfa, 0xff, 0x00, 0x00, 0xfa, 0xff, 0x00, 0x00) // element ID, length, params
+	return nil
+}
+
+func (b *BeaconTail2) SeventhElementIE() error {
+	b.SeventhElement = make([]byte, 0)
+	b.SeventhElement = append(b.SeventhElement, 0xC0, 0x05, 0x01, 0x2a, 0x00, 0xfc, 0xff) // element ID, length, params
+	return nil
+}
+
+func (b *BeaconTail2) EighthElementIE() error {
+	b.EighthElement = make([]byte, 0)
+	b.EighthElement = append(b.EighthElement, 0xC3, 0x04, 0x02, 0x2E, 0x2E, 0x2E) // element ID, length, params
+	return nil
+}
+
+func (b *BeaconTail2) NinthElementIE() error {
+	b.NinthElement = make([]byte, 0)
+	b.NinthElement = append(b.NinthElement, 0xDD, 0x18, 0x00, 0x50, 0xf2, 0x02, 0x01, 0x01, 0x01, 0x00, 0x03, 0xa4, 0x00, 0x00, 0x27, 0xa4, 0x00, 0x00, 0x42, 0x43, 0x5e, 0x00, 0x62, 0x32, 0x2f, 0x00) // element ID, length, params
+	return nil
+}
+
+func (b BeaconTail2) Serialize() []byte {
+	data := make([]byte, 0)
+
+	data = append(data, b.FirstElement...)
+	data = append(data, b.SecondElement...)
+	data = append(data, b.ThirdElement...)
+	data = append(data, b.FourthElement...)
+	data = append(data, b.ExtendedCapabilties...)
+	data = append(data, b.SixthElement...)
+	data = append(data, b.SeventhElement...)
+	data = append(data, b.EighthElement...)
+	data = append(data, b.NinthElement...)
+
+	return data
+}
+
+func (c *client) StartAP5GHz(ifi *Interface, ssid string, freqChannel byte) error {
+	_, err := c.get(
+		unix.NL80211_CMD_START_AP,
+		netlink.Acknowledge,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			// ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
+			beaconHead := BeaconHead{
+				ByteOrder: native.Endian,
+				FC:        0x0080, // protocol=0x0, Type=0x0 (mgmt) SubType=0x80 (Beacon), Flags=0x00
+				Duration:  0x0,
+				DA:        net.HardwareAddr{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
+				SA:        ifi.HardwareAddr,
+				BSSID:     ifi.HardwareAddr,
+				SeqCtlr:   0x0,
+				// Frame Body
+				Timestamp:      []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+				BeaconInterval: 0x0064,
+				// CapabilityInfo: 0x401, // bits set: ESS, Short Slot time
+				CapabilityInfo: 0x01, // bits set: ESS  -----> 5GHz VHT operation  // Short slot time is an 802.11g-only feature and does not apply to 802.11a radios.
+			}
+			(&beaconHead).SetSSIDIE(ssid)
+			(&beaconHead).AppendSupportedRateIE(true, 6)   // optional 6Mbps
+			(&beaconHead).AppendSupportedRateIE(false, 9)  // optional 9Mbps
+			(&beaconHead).AppendSupportedRateIE(true, 12)  // optional 12Mbps
+			(&beaconHead).AppendSupportedRateIE(false, 18) // optional 18Mbps
+			(&beaconHead).AppendSupportedRateIE(true, 24)  // optional 24Mbps
+			(&beaconHead).AppendSupportedRateIE(false, 36) // optional 36Mbps
+			(&beaconHead).AppendSupportedRateIE(false, 48) // optional 48Mbps
+			(&beaconHead).AppendSupportedRateIE(false, 54) // optional 54Mbps
+
+			(&beaconHead).SetDSParamIE(freqChannel)
+			ae.Bytes(unix.NL80211_ATTR_BEACON_HEAD, beaconHead.Serialize())
+
+			beaconTail := BeaconTail2{}
+			(&beaconTail).FirstElementIE()
+			(&beaconTail).SecondElementIE()
+			(&beaconTail).ThirdElementIE()
+			(&beaconTail).FourthElementIE()
+			(&beaconTail).SetExtendedCapabilties()
+			(&beaconTail).SixthElementIE()
+			(&beaconTail).SeventhElementIE()
+			(&beaconTail).EighthElementIE()
+			(&beaconTail).NinthElementIE()
 			ae.Bytes(unix.NL80211_ATTR_BEACON_TAIL, beaconTail.Serialize())
 
 			ae.Uint32(unix.NL80211_ATTR_BEACON_INTERVAL, uint32(100)) // 100 TU  ==> 102.4ms
@@ -1518,6 +1686,8 @@ func (c *client) SetBSS(ifi *Interface) error {
 			ae.Uint8(unix.NL80211_ATTR_BSS_SHORT_SLOT_TIME, 0x1)
 			ae.Uint8(unix.NL80211_ATTR_AP_ISOLATE, 0x0)
 			ae.Uint32(unix.NL80211_ATTR_BSS_BASIC_RATES, 0x160b0402) //  02 04 0b 16
+
+			ae.Uint16(unix.NL80211_ATTR_BSS_HT_OPMODE, 0x0) // 5GHz only
 		},
 	)
 	if err != nil {
