@@ -133,6 +133,9 @@ type Interface struct {
 
 	// regulatory domain
 	RegDom RegDom
+
+	// power saver state 0x0 -> off 0x1 -> on
+	PowerSaver []byte
 }
 
 // StationInfo contains statistics about a WiFi interface operating in

@@ -329,6 +329,54 @@ func (c *client) GetRegulatoryDomain(ifi *Interface) error {
 	return err
 }
 
+func (c *client) EnablePowerSaver(ifi *Interface) error {
+	_, err := c.get(
+		unix.NL80211_CMD_SET_POWER_SAVE,
+		netlink.Acknowledge,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			ae.Uint8(unix.NL80211_ATTR_PS_STATE, 0x1)
+		},
+	)
+
+	return err
+}
+func (c *client) DisablePowerSaver(ifi *Interface) error {
+	_, err := c.get(
+		unix.NL80211_CMD_SET_POWER_SAVE,
+		netlink.Acknowledge,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			ae.Uint8(unix.NL80211_ATTR_PS_STATE, 0x0)
+		},
+	)
+
+	return err
+}
+
+func (c *client) GetPowerSaverStatus(ifi *Interface) error {
+	msgs, err := c.get(
+		unix.NL80211_CMD_GET_POWER_SAVE,
+		0,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+		},
+	)
+
+	for _, m := range msgs {
+		attrs, err := netlink.UnmarshalAttributes(m.Data)
+		if err != nil {
+			return err
+		}
+
+		if err := ifi.parseAttributes(attrs); err != nil {
+			return err
+		}
+	}
+
+	return err
+}
+
 func (c *client) Authenticate(ifi *Interface, apMacAddr net.HardwareAddr, ssid string, freq uint32) error {
 	_, err := c.get(
 		unix.NL80211_CMD_AUTHENTICATE,
@@ -1967,6 +2015,8 @@ func (ifi *Interface) parseAttributes(attrs []netlink.Attribute) error {
 			ifi.RegDom.DFSRegion = byte(a.Data[0])
 		case unix.NL80211_ATTR_REG_RULES:
 			ifi.RegDom.Rules = a.Data
+		case unix.NL80211_ATTR_PS_STATE:
+			ifi.PowerSaver = a.Data
 		}
 	}
 
