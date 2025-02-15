@@ -534,6 +534,50 @@ func (c *client) SendProbeResponseFrame(ifi *Interface, dstMACAddr net.HardwareA
 	return c.SendFrame(ifi, freq, data)
 }
 
+func (c *client) SendProbeResponseFrame5GHz(ifi *Interface, dstMACAddr net.HardwareAddr, ssid string, freq uint32, freqChannel byte) error {
+	beaconHead := BeaconHead{
+		ByteOrder: native.Endian,
+		FC:        0x0050, // protocol=0x0, Type=0x0 (mgmt) SubType=0x50 (Probe Response), Flags=0x00
+		Duration:  0x0,
+		DA:        dstMACAddr,
+		SA:        ifi.HardwareAddr,
+		BSSID:     ifi.HardwareAddr,
+		SeqCtlr:   0x0,
+		// Frame Body
+		Timestamp:      []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		BeaconInterval: 0x0064,
+		CapabilityInfo: 0x01, // bits set: ESS
+	}
+	(&beaconHead).SetSSIDIE(ssid)
+	(&beaconHead).AppendSupportedRateIE(true, 6)   // optional 6Mbps
+	(&beaconHead).AppendSupportedRateIE(false, 9)  // optional 9Mbps
+	(&beaconHead).AppendSupportedRateIE(true, 12)  // optional 12Mbps
+	(&beaconHead).AppendSupportedRateIE(false, 18) // optional 18Mbps
+	(&beaconHead).AppendSupportedRateIE(true, 24)  // optional 24Mbps
+	(&beaconHead).AppendSupportedRateIE(false, 36) // optional 36Mbps
+	(&beaconHead).AppendSupportedRateIE(false, 48) // optional 48Mbps
+	(&beaconHead).AppendSupportedRateIE(false, 54) // optional 54Mbps
+	(&beaconHead).SetDSParamIE(freqChannel)
+
+	beaconTail := BeaconTail2{}
+	(&beaconTail).FirstElementIE()
+	(&beaconTail).SecondElementIE()
+	(&beaconTail).ThirdElementIE()
+	(&beaconTail).FourthElementIE()
+	(&beaconTail).SetExtendedCapabilties()
+	(&beaconTail).SixthElementIE()
+	(&beaconTail).SeventhElementIE()
+	(&beaconTail).EighthElementIE()
+	(&beaconTail).NinthElementIE()
+
+	data := make([]byte, 0)
+
+	data = append(data, beaconHead.Serialize()...)
+	data = append(data, beaconTail.Serialize()...)
+
+	return c.SendFrame(ifi, freq, data)
+}
+
 func (c *client) SendAuthResponseFrame(ifi *Interface, dstMACAddr net.HardwareAddr, freq uint32, algo, status uint16) error {
 	authResp := AuthResp{
 		ByteOrder: native.Endian,
@@ -981,163 +1025,12 @@ Ours
     Socket Owns Interface/Connection: true
     Control Port over NL80211: true
 
-
-
-4776.890864
-
-< Request: Start AP (0x0f) len 184 [ack]                                                                                                                                                                  4776.890864
-    Interface Index: 13 (0x0000000d)
-    Beacon Head: len 58
-        80 00 00 00 ff ff ff ff ff ff 04 f0 21 b5 9b 48  ............!..H
-        04 f0 21 b5 9b 48 00 00 00 00 00 00 00 00 00 00  ..!..H..........
-        64 00 01 04 00 07 42 6f 78 57 69 46 69 01 08 82  d.....BoxWiFi...
-        84 8b 96 0c 12 18 24 03 01 06                    ......$...
-    Beacon Tail: len 23
-        2a 01 04 32 04 30 48 60 6c 3b 02 51 00 7f 08 04  *..2.0H`l;.Q....
-        00 00 02 00 00 00 40                             ......@
-    Beacon Interval: 100 (0x00000064)
-    DTIM Period: 2 (0x00000002)
-    SSID: len 7
-        42 6f 78 57 69 46 69                             BoxWiFi
-    Hidden SSID: 0 (0x00000000)
-    Information Elements: len 10
-        Extended Capabilities: len 8
-            Capability: bit  2: Extended channel switching
-            Capability: bit 25: SSID list
-            Capability: bit 62: Opmode Notification
-            04 00 00 02 00 00 00 40                          .......@
-    IE Probe Response: len 10
-        Extended Capabilities: len 8
-            Capability: bit  2: Extended channel switching
-            Capability: bit 25: SSID list
-            Capability: bit 62: Opmode Notification
-            04 00 00 02 00 00 00 40                          .......@
-    IE Assoc Response: len 10
-        Extended Capabilities: len 8
-            Capability: bit  2: Extended channel switching
-            Capability: bit 25: SSID list
-            Capability: bit 62: Opmode Notification
-            04 00 00 02 00 00 00 40
-
-
-
-< Request: Start AP (0x0f) len 184 [ack]                                                                                                                                                                  3614.135766
-    Interface Index: 13 (0x0000000d)
-    Beacon Head: len 58
-        80 00 00 00 ff ff ff ff ff ff 04 f0 21 b5 9b 48  ............!..H
-        04 f0 21 b5 9b 48 00 00 00 00 00 00 00 00 00 00  ..!..H..........
-        64 00 01 04 00 07 42 6f 78 57 69 46 69 01 08 82  d.....BoxWiFi...
-        84 8b 96 0c 12 18 24 03 01 06                    ......$...
-    Beacon Tail: len 23
-        2a 01 04 32 04 30 48 60 6c 3b 02 51 00 7f 08 04  *..2.0H`l;.Q....
-        00 00 02 00 00 00 40                             ......@
-    Beacon Interval: 100 (0x00000064)
-    DTIM Period: 2 (0x00000002)
-    SSID: len 7
-        42 6f 78 57 69 46 69                             BoxWiFi
-    Hidden SSID: 0 (0x00000000)
-    Information Elements: len 10
-        Extended Capabilities: len 8
-            Capability: bit  2: Extended channel switching
-            Capability: bit 25: SSID list
-            Capability: bit 62: Opmode Notification
-            04 00 00 02 00 00 00 40                          .......@
-    IE Probe Response: len 10
-        Extended Capabilities: len 8
-            Capability: bit  2: Extended channel switching
-            Capability: bit 25: SSID list
-            Capability: bit 62: Opmode Notification
-            04 00 00 02 00 00 00 40                          .......@
-    IE Assoc Response: len 10
-        Extended Capabilities: len 8
-            Capability: bit  2: Extended channel switching
-            Capability: bit 25: SSID list
-            Capability: bit 62: Opmode Notification
-            04 00 00 02 00 00 00 40                          .......@
-*/
-
 /*
 *	Information Elements
 *	https://www.nsnam.org/docs/release/3.15/doxygen/wifi-information-element_8h_source.html
- */
+*/
 
 /*
-
- < Request: Start AP (0x0f) len 292 [ack]                                                                                                                                                                     7.990268
-    Interface Index: 6 (0x00000006)
-    Beacon Head: len 58
-        80 00 00 00 ff ff ff ff ff ff 04 f0 21 b5 9b 48  ............!..H
-        04 f0 21 b5 9b 48 00 00 00 00 00 00 00 00 00 00  ..!..H..........
-        64 00 01 00 00 07 42 6f 78 57 69 46 69 01 08 8c  d.....BoxWiFi...
-        12 98 24 b0 48 60 6c 03 01 28                    ..$.H`l..(
-    Beacon Tail: len 123
-        32 02 ff fe 3b 02 80 00 2d 1a 6e 08 1b ff ff 00  2...;...-.n.....
-        00 00 00 00 00 00 00 00 00 01 00 00 00 00 00 00  ................
-        00 00 00 00 3d 16 28 07 00 00 00 00 00 00 00 00  ....=.(.........
-        00 00 00 00 00 00 00 00 00 00 00 00 7f 08 04 00  ................
-        00 02 00 00 00 40 bf 0c a2 00 00 00 fa ff 00 00  .....@..........
-        fa ff 00 00 c0 05 01 2a 00 fc ff c3 04 02 2e 2e  .......*........
-        2e dd 18 00 50 f2 02 01 01 01 00 03 a4 00 00 27  ....P..........'
-        a4 00 00 42 43 5e 00 62 32 2f 00                 ...BC^.b2/.
-    Beacon Interval: 100 (0x00000064)
-    DTIM Period: 2 (0x00000002)
-    SSID: len 7
-        42 6f 78 57 69 46 69                             BoxWiFi
-    Hidden SSID: 0 (0x00000000)
-    Reserved: len 1
-        00                                               .
-    Information Elements: len 10
-        Extended Capabilities: len 8
-            Capability: bit  2: Extended channel switching
-            Capability: bit 25: SSID list
-            Capability: bit 62: Opmode Notification
-            04 00 00 02 00 00 00 40                          .......@
-    IE Probe Response: len 10
-        Extended Capabilities: len 8
-            Capability: bit  2: Extended channel switching
-            Capability: bit 25: SSID list
-            Capability: bit 62: Opmode Notification
-            04 00 00 02 00 00 00 40                          .......@
-    IE Assoc Response: len 10
-        Extended Capabilities: len 8
-            Capability: bit  2: Extended channel switching
-            Capability: bit 25: SSID list
-            Capability: bit 62: Opmode Notification
-            04 00 00 02 00 00 00 40                          .......@
-
-< Request: Start AP (0x0f) len 292 [ack]                                                                                                                                                                                                                               1.820943
-    Interface Index: 6 (0x00000006)
-    Beacon Head: len 58
-        80 00 00 00 ff ff ff ff ff ff 04 f0 21 b5 9b 48  ............!..H
-        04 f0 21 b5 9b 48 00 00 00 00 00 00 00 00 00 00  ..!..H..........
-        64 00 01 00 00 07 42 6f 78 57 69 46 69 01 08 8c  d.....BoxWiFi...
-        12 98 24 b0 48 60 6c 03 01 24                    ..$.H`l..$
-    Beacon Tail: len 123
-        32 02 ff fe 3b 02 80 00 2d 1a 6e 08 1b ff ff 00  2...;...-.n.....
-        00 00 00 00 00 00 00 00 00 01 00 00 00 00 00 00  ................
-        00 00 00 00 3d 16 24 05 00 00 00 00 00 00 00 00  ....=.$.........
-        00 00 00 00 00 00 00 00 00 00 00 00 7f 08 04 00  ................
-        00 02 00 00 00 40 bf 0c a2 00 00 00 fa ff 00 00  .....@..........
-        fa ff 00 00 c0 05 01 2a 00 fc ff c3 04 02 2e 2e  .......*........
-        2e dd 18 00 50 f2 02 01 01 01 00 03 a4 00 00 27  ....P..........'
-        a4 00 00 42 43 5e 00 62 32 2f 00                 ...BC^.b2/.
-
-< Request: Start AP (0x0f) len 284 [ack]                                                                                                                                                                     4.946199
-    Interface Index: 6 (0x00000006)
-    Beacon Head: len 58
-        80 00 00 00 ff ff ff ff ff ff 04 f0 21 b5 9b 48  ............!..H
-        04 f0 21 b5 9b 48 00 00 00 00 00 00 00 00 00 00  ..!..H..........
-        64 00 01 00 00 07 42 6f 78 57 69 46 69 01 08 8c  d.....BoxWiFi...
-        12 98 24 b0 48 60 6c 03 01 24                    ..$.H`l..$
-    Beacon Tail: len 123
-        32 02 ff fe 3b 02 80 00 2d 1a 6e 08 1b ff ff 00  2...;...-.n.....
-        00 00 00 00 00 00 00 00 00 01 00 00 00 00 00 00  ................
-        00 00 00 00 3d 16 24 05 00 00 00 00 00 00 00 00  ....=.$.........
-        00 00 00 00 00 00 00 00 00 00 00 00 7f 08 04 00  ................
-        00 02 00 00 00 40 bf 0c a2 00 00 00 fa ff 00 00  .....@..........
-        fa ff 00 00 c0 05 01 2a 00 fc ff c3 04 02 2e 2e  .......*........
-        2e dd 18 00 50 f2 02 01 01 01 00 03 a4 00 00 27  ....P..........'
-        a4 00 00 42 43 5e 00 62 32 2f 00                 ...BC^.b2/.
 
 < Request: Start AP (0x0f) len 284 [ack]                                                                                                                                                                                                                              10.950167
     Interface Index: 6 (0x00000006)
