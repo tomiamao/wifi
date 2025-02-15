@@ -161,6 +161,10 @@ func (c *Client) SendAssocResponseFrame(ifi *Interface, dstMACAddr net.HardwareA
 	return c.c.SendAssocResponseFrame(ifi, dstMACAddr, freq, aid, capInfo, status)
 }
 
+func (c *Client) SendAssocResponseFrame5GHz(ifi *Interface, dstMACAddr net.HardwareAddr, freq uint32, aid, capInfo, status uint16) error {
+	return c.c.SendAssocResponseFrame5GHz(ifi, dstMACAddr, freq, aid, capInfo, status)
+}
+
 func (c *Client) SendFrame(ifi *Interface, freq uint32, data []byte) error {
 	return c.c.SendFrame(ifi, freq, data)
 }
