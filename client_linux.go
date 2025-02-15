@@ -771,6 +771,29 @@ func (c *client) SetStation(ifi *Interface, mac net.HardwareAddr, aid, staCap, l
 	return err
 }
 
+func (c *client) SetStation5GHz(ifi *Interface, mac net.HardwareAddr, aid, staCap, listenInterval uint16, suppRates, htCap, vhtCap []byte, mask, set uint64) error {
+	_, err := c.get(
+		unix.NL80211_CMD_SET_STATION,
+		netlink.Acknowledge,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			ae.Bytes(unix.NL80211_ATTR_MAC, mac)
+
+			ae.Bytes(unix.NL80211_ATTR_STA_SUPPORTED_RATES, suppRates)
+			ae.Uint16(unix.NL80211_ATTR_STA_CAPABILITY, staCap)
+			ae.Uint16(unix.NL80211_ATTR_STA_AID, aid)
+			ae.Uint16(unix.NL80211_ATTR_STA_LISTEN_INTERVAL, listenInterval)
+
+			ae.Bytes(unix.NL80211_ATTR_HT_CAPABILITY, htCap)
+			ae.Bytes(unix.NL80211_ATTR_VHT_CAPABILITY, vhtCap)
+
+			ae.Uint64(unix.NL80211_ATTR_STA_FLAGS2, ((set << 32) | mask))
+		},
+	)
+
+	return err
+}
+
 func (c *client) SetStationFlags(ifi *Interface, mac net.HardwareAddr, mask, set uint64) error {
 	_, err := c.get(
 		unix.NL80211_CMD_SET_STATION,

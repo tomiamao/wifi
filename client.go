@@ -137,6 +137,10 @@ func (c *Client) SetStation(ifi *Interface, mac net.HardwareAddr, aid, staCap, l
 	return c.c.SetStation(ifi, mac, aid, staCap, listenInterval, suppRates, mask, set)
 }
 
+func (c *Client) SetStation5GHz(ifi *Interface, mac net.HardwareAddr, aid, staCap, listenInterval uint16, suppRates, htCap, vhtCap []byte, mask, set uint64) error {
+	return c.c.SetStation5GHz(ifi, mac, aid, staCap, listenInterval, suppRates, htCap, vhtCap, mask, set)
+}
+
 func (c *Client) SetStationFlags(ifi *Interface, mac net.HardwareAddr, mask, set uint64) error {
 	return c.c.SetStationFlags(ifi, mac, mask, set)
 }
