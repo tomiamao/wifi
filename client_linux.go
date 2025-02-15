@@ -560,13 +560,13 @@ func (c *client) SendProbeResponseFrame5GHz(ifi *Interface, dstMACAddr net.Hardw
 	(&beaconHead).SetDSParamIE(freqChannel)
 
 	beaconTail := BeaconTail2{}
-	(&beaconTail).FirstElementIE()
+	(&beaconTail).SetExtendedSupportedRates()
 	(&beaconTail).SecondElementIE()
-	(&beaconTail).ThirdElementIE()
-	(&beaconTail).FourthElementIE()
+	(&beaconTail).SetHTCapabilties()
+	(&beaconTail).SetHTOperation()
 	(&beaconTail).SetExtendedCapabilties()
-	(&beaconTail).SixthElementIE()
-	(&beaconTail).SeventhElementIE()
+	(&beaconTail).SetTag191()
+	(&beaconTail).SetTag192()
 	(&beaconTail).EighthElementIE()
 	(&beaconTail).NinthElementIE()
 
@@ -628,6 +628,42 @@ func (c *client) SendAssocResponseFrame(ifi *Interface, dstMACAddr net.HardwareA
 	(&assocResp).SetExtendedCapabilties()
 
 	(&assocResp).SetBSSMaxIdlePeriod()
+
+	return c.SendFrame(ifi, freq, assocResp.Serialize())
+}
+
+func (c *client) SendAssocResponseFrame5GHz(ifi *Interface, dstMACAddr net.HardwareAddr, freq uint32, aid, capInfo, status uint16) error {
+	assocResp := AssocResp2{
+		ByteOrder: native.Endian,
+		FC:        0x0010, // protocol=0x0, Type=0x0 (mgmt) SubType=0x10 (Assoc Response), Flags=0x00
+		Duration:  0x0,
+		DA:        dstMACAddr,
+		SA:        ifi.HardwareAddr,
+		BSSID:     ifi.HardwareAddr,
+		SeqCtlr:   0x0,
+		// Frame Body
+		CapabilityInfo: capInfo,
+		Status:         status,
+		AID:            (0xC000 | aid), // first 2 bits of AID are set to 1
+	}
+
+	(&assocResp).AppendSupportedRateIE(true, 6)   // optional 6Mbps
+	(&assocResp).AppendSupportedRateIE(false, 9)  // optional 9Mbps
+	(&assocResp).AppendSupportedRateIE(true, 12)  // optional 12Mbps
+	(&assocResp).AppendSupportedRateIE(false, 18) // optional 18Mbps
+	(&assocResp).AppendSupportedRateIE(true, 24)  // optional 24Mbps
+	(&assocResp).AppendSupportedRateIE(false, 36) // optional 36Mbps
+	(&assocResp).AppendSupportedRateIE(false, 48) // optional 48Mbps
+	(&assocResp).AppendSupportedRateIE(false, 54) // optional 54Mbps
+
+	(&assocResp).SetExtendedSupportedRates() // BSS membership HT_PHY 63.0(B) Mbit/s
+	(&assocResp).SetHTCapabilties()
+	(&assocResp).SetHTOperation()
+	(&assocResp).SetTag191()
+	(&assocResp).SetTag192()
+	(&assocResp).SetExtendedCapabilties()
+	(&assocResp).SetTag90()
+	(&assocResp).NinthElementIE()
 
 	return c.SendFrame(ifi, freq, assocResp.Serialize())
 }
@@ -1158,20 +1194,20 @@ func (c *client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
 }
 
 type BeaconTail2 struct {
-	FirstElement        []byte // ID: 0x32 len: 2
-	SecondElement       []byte // ID: 0x3b len: 2
-	ThirdElement        []byte // ID: 0x2d len: 26
-	FourthElement       []byte // ID: 0x3d len: 22
-	ExtendedCapabilties []byte
-	SixthElement        []byte // ID: 0xbf len: 12
-	SeventhElement      []byte // ID: 0xc0 len: 5
-	EighthElement       []byte // ID: 0xc3 len: 4
-	NinthElement        []byte // ID: 0xdd len: 24
+	ExtendedSupportedRates []byte // ID: 0x32 len: 2
+	SecondElement          []byte // ID: 0x3b len: 2
+	HTCapabilties          []byte // ID: 0x2d len: 26
+	HTOperation            []byte // ID: 0x3d len: 22
+	ExtendedCapabilties    []byte
+	Tag191                 []byte // ID: 0xbf len: 12
+	Tag192                 []byte // ID: 0xc0 len: 5
+	EighthElement          []byte // ID: 0xc3 len: 4
+	NinthElement           []byte // ID: 0xdd len: 24
 }
 
-func (b *BeaconTail2) FirstElementIE() error {
-	b.FirstElement = make([]byte, 0)
-	b.FirstElement = append(b.FirstElement, 0x32, 0x02, 0xFF, 0xFE) // element ID, length, params
+func (b *BeaconTail2) SetExtendedSupportedRates() error {
+	b.ExtendedSupportedRates = make([]byte, 0)
+	b.ExtendedSupportedRates = append(b.ExtendedSupportedRates, 0x32, 0x02, 0xFF, 0xFE) // element ID, length, params
 	return nil
 }
 
@@ -1181,15 +1217,15 @@ func (b *BeaconTail2) SecondElementIE() error {
 	return nil
 }
 
-func (b *BeaconTail2) ThirdElementIE() error {
-	b.ThirdElement = make([]byte, 0)
-	b.ThirdElement = append(b.ThirdElement, 0x2D, 0x1A, 0x6e, 0x08, 0x1b, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00) // element ID, length, params
+func (b *BeaconTail2) SetHTCapabilties() error {
+	b.HTCapabilties = make([]byte, 0)
+	b.HTCapabilties = append(b.HTCapabilties, 0x2D, 0x1A, 0x6e, 0x08, 0x1b, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00) // element ID, length, params
 	return nil
 }
 
-func (b *BeaconTail2) FourthElementIE() error {
-	b.FourthElement = make([]byte, 0)
-	b.FourthElement = append(b.FourthElement, 0x3D, 0x16, 0x24, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00) // element ID, length, params
+func (b *BeaconTail2) SetHTOperation() error {
+	b.HTOperation = make([]byte, 0)
+	b.HTOperation = append(b.HTOperation, 0x3D, 0x16, 0x24, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00) // element ID, length, params
 	return nil
 }
 
@@ -1199,15 +1235,15 @@ func (b *BeaconTail2) SetExtendedCapabilties() error {
 	return nil
 }
 
-func (b *BeaconTail2) SixthElementIE() error {
-	b.SixthElement = make([]byte, 0)
-	b.SixthElement = append(b.SixthElement, 0xBF, 0x0C, 0xa2, 0x00, 0x00, 0x00, 0xfa, 0xff, 0x00, 0x00, 0xfa, 0xff, 0x00, 0x00) // element ID, length, params
+func (b *BeaconTail2) SetTag191() error {
+	b.Tag191 = make([]byte, 0)
+	b.Tag191 = append(b.Tag191, 0xBF, 0x0C, 0xa2, 0x00, 0x00, 0x00, 0xfa, 0xff, 0x00, 0x00, 0xfa, 0xff, 0x00, 0x00) // element ID, length, params
 	return nil
 }
 
-func (b *BeaconTail2) SeventhElementIE() error {
-	b.SeventhElement = make([]byte, 0)
-	b.SeventhElement = append(b.SeventhElement, 0xC0, 0x05, 0x01, 0x2a, 0x00, 0xfc, 0xff) // element ID, length, params
+func (b *BeaconTail2) SetTag192() error {
+	b.Tag192 = make([]byte, 0)
+	b.Tag192 = append(b.Tag192, 0xC0, 0x05, 0x01, 0x2a, 0x00, 0xfc, 0xff) // element ID, length, params
 	return nil
 }
 
@@ -1226,13 +1262,13 @@ func (b *BeaconTail2) NinthElementIE() error {
 func (b BeaconTail2) Serialize() []byte {
 	data := make([]byte, 0)
 
-	data = append(data, b.FirstElement...)
+	data = append(data, b.ExtendedSupportedRates...)
 	data = append(data, b.SecondElement...)
-	data = append(data, b.ThirdElement...)
-	data = append(data, b.FourthElement...)
+	data = append(data, b.HTCapabilties...)
+	data = append(data, b.HTOperation...)
 	data = append(data, b.ExtendedCapabilties...)
-	data = append(data, b.SixthElement...)
-	data = append(data, b.SeventhElement...)
+	data = append(data, b.Tag191...)
+	data = append(data, b.Tag192...)
 	data = append(data, b.EighthElement...)
 	data = append(data, b.NinthElement...)
 
@@ -1269,18 +1305,17 @@ func (c *client) StartAP5GHz(ifi *Interface, ssid string, freqChannel byte) erro
 			(&beaconHead).AppendSupportedRateIE(false, 36) // optional 36Mbps
 			(&beaconHead).AppendSupportedRateIE(false, 48) // optional 48Mbps
 			(&beaconHead).AppendSupportedRateIE(false, 54) // optional 54Mbps
-
 			(&beaconHead).SetDSParamIE(freqChannel)
 			ae.Bytes(unix.NL80211_ATTR_BEACON_HEAD, beaconHead.Serialize())
 
 			beaconTail := BeaconTail2{}
-			(&beaconTail).FirstElementIE()
+			(&beaconTail).SetExtendedSupportedRates()
 			(&beaconTail).SecondElementIE()
-			(&beaconTail).ThirdElementIE()
-			(&beaconTail).FourthElementIE()
+			(&beaconTail).SetHTCapabilties()
+			(&beaconTail).SetHTOperation()
 			(&beaconTail).SetExtendedCapabilties()
-			(&beaconTail).SixthElementIE()
-			(&beaconTail).SeventhElementIE()
+			(&beaconTail).SetTag191()
+			(&beaconTail).SetTag192()
 			(&beaconTail).EighthElementIE()
 			(&beaconTail).NinthElementIE()
 			ae.Bytes(unix.NL80211_ATTR_BEACON_TAIL, beaconTail.Serialize())
