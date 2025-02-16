@@ -1391,10 +1391,6 @@ func (c *client) StartAP5GHz(ifi *Interface, ssid string, freqChannel byte, rsnE
 			ae.Bytes(unix.NL80211_ATTR_SSID, []byte(ssid))
 			ae.Uint32(unix.NL80211_ATTR_HIDDEN_SSID, uint32(unix.NL80211_HIDDEN_SSID_NOT_IN_USE))
 
-			// ae.Uint32(unix.NL80211_ATTR_AUTH_TYPE, unix.NL80211_AUTHTYPE_OPEN_SYSTEM)
-
-			// ae.Flag(unix.NL80211_ATTR_PRIVACY, false)
-
 			// TODO: figure out what these values mean
 			ae.Bytes(unix.NL80211_ATTR_IE, []byte{0x7F, 0x8, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
 			ae.Bytes(unix.NL80211_ATTR_IE_PROBE_RESP, []byte{0x7F, 0x8, 0x04, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40})
@@ -1414,8 +1410,8 @@ func (c *client) StartAP5GHz(ifi *Interface, ssid string, freqChannel byte, rsnE
 				   				NL80211_ATTR_CONTROL_PORT_OVER_NL80211,
 				   				0, NULL);
 				*/
-				// ae.Flag(unix.NL80211_ATTR_SOCKET_OWNER, true)
-				// ae.Flag(unix.NL80211_ATTR_CONTROL_PORT_OVER_NL80211, true)
+				ae.Flag(unix.NL80211_ATTR_SOCKET_OWNER, true)
+				ae.Flag(unix.NL80211_ATTR_CONTROL_PORT_OVER_NL80211, true)
 			}
 
 			if rsnEnable {
@@ -1425,6 +1421,7 @@ func (c *client) StartAP5GHz(ifi *Interface, ssid string, freqChannel byte, rsnE
 				)
 
 				ae.Flag(unix.NL80211_ATTR_PRIVACY, true)
+				ae.Uint32(unix.NL80211_ATTR_AUTH_TYPE, unix.NL80211_AUTHTYPE_OPEN_SYSTEM)
 				ae.Uint32(unix.NL80211_ATTR_WPA_VERSIONS, unix.NL80211_WPA_VERSION_2)
 				ae.Uint32(unix.NL80211_ATTR_CIPHER_SUITE_GROUP, cipherSuites)
 				ae.Uint32(unix.NL80211_ATTR_CIPHER_SUITES_PAIRWISE, cipherSuites)
