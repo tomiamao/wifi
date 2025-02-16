@@ -534,7 +534,7 @@ func (c *client) SendProbeResponseFrame(ifi *Interface, dstMACAddr net.HardwareA
 	return c.SendFrame(ifi, freq, data)
 }
 
-func (c *client) SendProbeResponseFrame5GHz(ifi *Interface, dstMACAddr net.HardwareAddr, ssid string, freq uint32, freqChannel byte) error {
+func (c *client) SendProbeResponseFrame5GHz(ifi *Interface, dstMACAddr net.HardwareAddr, ssid string, freq uint32, freqChannel byte, rsnEnable bool) error {
 	beaconHead := BeaconHead{
 		ByteOrder: native.Endian,
 		FC:        0x0050, // protocol=0x0, Type=0x0 (mgmt) SubType=0x50 (Probe Response), Flags=0x00
@@ -561,6 +561,9 @@ func (c *client) SendProbeResponseFrame5GHz(ifi *Interface, dstMACAddr net.Hardw
 
 	beaconTail := BeaconTail2{}
 	(&beaconTail).SetExtendedSupportedRates()
+	if rsnEnable {
+		(&beaconTail).SetRSN()
+	}
 	(&beaconTail).SecondElementIE()
 	(&beaconTail).SetHTCapabilties()
 	(&beaconTail).SetHTOperation()
@@ -1218,6 +1221,7 @@ func (c *client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
 
 type BeaconTail2 struct {
 	ExtendedSupportedRates []byte // ID: 0x32 len: 2
+	RSN                    []byte // ID: 0x30 len: 20 Robust security network
 	SecondElement          []byte // ID: 0x3b len: 2
 	HTCapabilties          []byte // ID: 0x2d len: 26
 	HTOperation            []byte // ID: 0x3d len: 22
@@ -1231,6 +1235,37 @@ type BeaconTail2 struct {
 func (b *BeaconTail2) SetExtendedSupportedRates() error {
 	b.ExtendedSupportedRates = make([]byte, 0)
 	b.ExtendedSupportedRates = append(b.ExtendedSupportedRates, 0x32, 0x02, 0xFF, 0xFE) // element ID, length, params
+	return nil
+}
+
+func (b *BeaconTail2) SetRSN() error {
+	b.RSN = make([]byte, 0)
+	// element ID: 48 (0x32)
+	// len: 20 (0x14)
+
+	// version: 0x1  (2 bytes)
+	// Group Cipher OUI: 00-0F-AC
+	// Group Cipher Type: 0x04
+
+	// Pairwise Cipher suite count: 0x1  (2 bytes)
+	// Pairwise Cipher OUI: 00-0F-AC
+	// Pairwise Cipher Type: 0x04
+
+	// Auth Key Mgmt Suite count: 0x1 (2 bytes)
+	// Authentication Method AKM Suites: 00-0F-AC
+	// Authentication Method AKM Suites Type: 0x02
+
+	// RSN Capabilities: 0x0c 0x00
+
+	/*
+		RSN-IE also used to indicate what authentication methods are supported.
+		The Authentication Key Management (AKM) suite indicate whether the station support 802.1X or PSK authentication.
+		Below are the 3 different AKM suite values depend on the Authentication method used.
+		00-0F-AC-01 (802.1X)
+		00-0F-AC-02 (PSK)
+		00-0F-AC-03 (FT over 802.1X)
+	*/
+	b.RSN = append(b.RSN, 0x30, 0x14, 0x01, 0x00, 0x00, 0x0F, 0xAC, 0x04, 0x01, 0x00, 0x00, 0x0F, 0xAC, 0x04, 0x01, 0x00, 0x00, 0x0F, 0xAC, 0x02, 0x0C, 0x00) // element ID, length, params
 	return nil
 }
 
@@ -1286,6 +1321,9 @@ func (b BeaconTail2) Serialize() []byte {
 	data := make([]byte, 0)
 
 	data = append(data, b.ExtendedSupportedRates...)
+	if b.RSN != nil {
+		data = append(data, b.RSN...)
+	}
 	data = append(data, b.SecondElement...)
 	data = append(data, b.HTCapabilties...)
 	data = append(data, b.HTOperation...)
@@ -1298,7 +1336,7 @@ func (b BeaconTail2) Serialize() []byte {
 	return data
 }
 
-func (c *client) StartAP5GHz(ifi *Interface, ssid string, freqChannel byte) error {
+func (c *client) StartAP5GHz(ifi *Interface, ssid string, freqChannel byte, rsnEnable bool) error {
 	_, err := c.get(
 		unix.NL80211_CMD_START_AP,
 		netlink.Acknowledge,
@@ -1333,6 +1371,9 @@ func (c *client) StartAP5GHz(ifi *Interface, ssid string, freqChannel byte) erro
 
 			beaconTail := BeaconTail2{}
 			(&beaconTail).SetExtendedSupportedRates()
+			if rsnEnable {
+				(&beaconTail).SetRSN()
+			}
 			(&beaconTail).SecondElementIE()
 			(&beaconTail).SetHTCapabilties()
 			(&beaconTail).SetHTOperation()
@@ -1375,6 +1416,19 @@ func (c *client) StartAP5GHz(ifi *Interface, ssid string, freqChannel byte) erro
 				*/
 				// ae.Flag(unix.NL80211_ATTR_SOCKET_OWNER, true)
 				// ae.Flag(unix.NL80211_ATTR_CONTROL_PORT_OVER_NL80211, true)
+			}
+
+			if rsnEnable {
+				const (
+					cipherSuites = 0xfac04
+					akmSuites    = 0xfac02
+				)
+
+				ae.Flag(unix.NL80211_ATTR_PRIVACY, true)
+				ae.Uint32(unix.NL80211_ATTR_WPA_VERSIONS, unix.NL80211_WPA_VERSION_2)
+				ae.Uint32(unix.NL80211_ATTR_CIPHER_SUITE_GROUP, cipherSuites)
+				ae.Uint32(unix.NL80211_ATTR_CIPHER_SUITES_PAIRWISE, cipherSuites)
+				ae.Uint32(unix.NL80211_ATTR_AKM_SUITES, akmSuites)
 			}
 		},
 	)

@@ -153,8 +153,8 @@ func (c *Client) SendProbeResponseFrame(ifi *Interface, dstMACAddr net.HardwareA
 	return c.c.SendProbeResponseFrame(ifi, dstMACAddr, ssid, freq, freqChannel)
 }
 
-func (c *Client) SendProbeResponseFrame5GHz(ifi *Interface, dstMACAddr net.HardwareAddr, ssid string, freq uint32, freqChannel byte) error {
-	return c.c.SendProbeResponseFrame5GHz(ifi, dstMACAddr, ssid, freq, freqChannel)
+func (c *Client) SendProbeResponseFrame5GHz(ifi *Interface, dstMACAddr net.HardwareAddr, ssid string, freq uint32, freqChannel byte, rsnEnable bool) error {
+	return c.c.SendProbeResponseFrame5GHz(ifi, dstMACAddr, ssid, freq, freqChannel, rsnEnable)
 }
 
 func (c *Client) SendAuthResponseFrame(ifi *Interface, dstMACAddr net.HardwareAddr, freq uint32, algo, status uint16) error {
@@ -192,8 +192,8 @@ func (c *Client) StartAP(ifi *Interface, ssid string, freqChannel byte) error {
 	return c.c.StartAP(ifi, ssid, freqChannel)
 }
 
-func (c *Client) StartAP5GHz(ifi *Interface, ssid string, freqChannel byte) error {
-	return c.c.StartAP5GHz(ifi, ssid, freqChannel)
+func (c *Client) StartAP5GHz(ifi *Interface, ssid string, freqChannel byte, rsnEnable bool) error {
+	return c.c.StartAP5GHz(ifi, ssid, freqChannel, rsnEnable)
 }
 
 func (c *Client) StopAP(ifi *Interface) error {
