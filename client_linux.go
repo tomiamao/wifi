@@ -698,7 +698,6 @@ func (c *client) SendControlPortFrame(ifi *Interface, dstMACAddr net.HardwareAdd
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			ae.Bytes(unix.NL80211_ATTR_MAC, dstMACAddr)
-			ae.Uint32(unix.NL80211_ATTR_WIPHY_FREQ, freq)
 			ae.Bytes(unix.NL80211_ATTR_FRAME, data)
 		},
 	)
