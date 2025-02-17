@@ -1343,6 +1343,11 @@ func (c *client) StartAP5GHz(ifi *Interface, ssid string, freqChannel byte, rsnE
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
 			// ae.Uint32(unix.NL80211_ATTR_IFINDEX, uint32(ifi.Index))
+			capInfo := 0x01 // bits set: ESS  -----> 5GHz VHT operation  // Short slot time is an 802.11g-only feature and does not apply to 802.11a radios.
+			if rsnEnable {
+				capInfo = 0x11
+			}
+
 			beaconHead := BeaconHead{
 				ByteOrder: native.Endian,
 				FC:        0x0080, // protocol=0x0, Type=0x0 (mgmt) SubType=0x80 (Beacon), Flags=0x00
@@ -1355,7 +1360,7 @@ func (c *client) StartAP5GHz(ifi *Interface, ssid string, freqChannel byte, rsnE
 				Timestamp:      []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 				BeaconInterval: 0x0064,
 				// CapabilityInfo: 0x401, // bits set: ESS, Short Slot time
-				CapabilityInfo: 0x01, // bits set: ESS  -----> 5GHz VHT operation  // Short slot time is an 802.11g-only feature and does not apply to 802.11a radios.
+				CapabilityInfo: uint16(capInfo), // bits set: ESS  -----> 5GHz VHT operation  // Short slot time is an 802.11g-only feature and does not apply to 802.11a radios.
 			}
 			(&beaconHead).SetSSIDIE(ssid)
 			(&beaconHead).AppendSupportedRateIE(true, 6)   // optional 6Mbps
