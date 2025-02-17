@@ -671,58 +671,6 @@ func (c *client) SendAssocResponseFrame5GHz(ifi *Interface, dstMACAddr net.Hardw
 	return c.SendFrame(ifi, freq, assocResp.Serialize())
 }
 
-type DataFrame struct {
-	ByteOrder binary.ByteOrder
-	// MAC Header
-	FC       uint16 // Frame Control - length 2
-	Duration uint16 // length 2
-	DA       net.HardwareAddr
-	BSSID    net.HardwareAddr
-	SA       net.HardwareAddr
-	SeqCtlr  uint16 // len 2 -> Fragment number (4 bits) + Sequence number (12 bits)
-	Data     []byte
-}
-
-func (b DataFrame) Serialize() []byte {
-	data := make([]byte, 0)
-
-	fc := make([]byte, 2)
-	b.ByteOrder.PutUint16(fc, b.FC)
-	data = append(data, fc...)
-
-	duration := make([]byte, 2)
-	b.ByteOrder.PutUint16(duration, b.Duration)
-	data = append(data, duration...)
-
-	data = append(data, b.DA...)
-	data = append(data, b.BSSID...)
-	data = append(data, b.SA...)
-
-	seqCtrl := make([]byte, 2)
-	b.ByteOrder.PutUint16(seqCtrl, b.SeqCtlr)
-	data = append(data, seqCtrl...)
-
-	data = append(data, b.Data...)
-
-	return data
-}
-
-func (c *client) SendDataFrame(ifi *Interface, dstMACAddr net.HardwareAddr, freq uint32, data []byte) error {
-	dataFrame := DataFrame{
-		ByteOrder: native.Endian,
-		FC:        0x8802, // protocol=0x0, Type=0x2 (data) SubType=0x8 (QoS Data), Flags=0x00
-		Duration:  0x0,
-		DA:        dstMACAddr,
-		BSSID:     ifi.HardwareAddr,
-		SA:        ifi.HardwareAddr,
-		SeqCtlr:   0x0,
-		// Frame Body
-		Data: data,
-	}
-
-	return c.SendFrame(ifi, freq, dataFrame.Serialize())
-}
-
 func (c *client) SendFrame(ifi *Interface, freq uint32, data []byte) error {
 	_, err := c.get(
 		unix.NL80211_CMD_FRAME,
@@ -735,6 +683,21 @@ func (c *client) SendFrame(ifi *Interface, freq uint32, data []byte) error {
 				}
 			*/
 			// ae.Flag(unix.NL80211_ATTR_DONT_WAIT_FOR_ACK, true)
+			ae.Uint32(unix.NL80211_ATTR_WIPHY_FREQ, freq)
+			ae.Bytes(unix.NL80211_ATTR_FRAME, data)
+		},
+	)
+
+	return err
+}
+
+func (c *client) SendControlPortFrame(ifi *Interface, dstMACAddr net.HardwareAddr, freq uint32, data []byte) error {
+	_, err := c.get(
+		unix.NL80211_CMD_CONTROL_PORT_FRAME,
+		0,
+		ifi,
+		func(ae *netlink.AttributeEncoder) {
+			ae.Bytes(unix.NL80211_ATTR_MAC, dstMACAddr)
 			ae.Uint32(unix.NL80211_ATTR_WIPHY_FREQ, freq)
 			ae.Bytes(unix.NL80211_ATTR_FRAME, data)
 		},
