@@ -694,9 +694,10 @@ func (c *client) SendFrame(ifi *Interface, freq uint32, data []byte) error {
 func (c *client) SendControlPortFrame(ifi *Interface, dstMACAddr net.HardwareAddr, freq uint32, data []byte) error {
 	_, err := c.get(
 		unix.NL80211_CMD_CONTROL_PORT_FRAME,
-		0,
+		netlink.Acknowledge,
 		ifi,
 		func(ae *netlink.AttributeEncoder) {
+			ae.Uint16(unix.NL80211_ATTR_CONTROL_PORT_ETHERTYPE, 0x888E)
 			ae.Bytes(unix.NL80211_ATTR_MAC, dstMACAddr)
 			ae.Bytes(unix.NL80211_ATTR_FRAME, data)
 		},
